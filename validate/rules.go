@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/model"
 )
 
 // Rule represents a validation rule.

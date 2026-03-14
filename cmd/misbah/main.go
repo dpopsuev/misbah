@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/jabal/jabal/cli"
+	"github.com/dpopsuev/misbah/cli"
 )
 
 func main() {

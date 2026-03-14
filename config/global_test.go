@@ -11,17 +11,17 @@ import (
 
 func TestLoadGlobalConfig(t *testing.T) {
 	// Save original env and restore after test
-	originalConfigDir := os.Getenv("JABAL_CONFIG_DIR")
+	originalConfigDir := os.Getenv("MISBAH_CONFIG_DIR")
 	defer func() {
 		if originalConfigDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", originalConfigDir)
+			os.Setenv("MISBAH_CONFIG_DIR", originalConfigDir)
 		} else {
-			os.Unsetenv("JABAL_CONFIG_DIR")
+			os.Unsetenv("MISBAH_CONFIG_DIR")
 		}
 	}()
 
 	tmpDir := t.TempDir()
-	os.Setenv("JABAL_CONFIG_DIR", tmpDir)
+	os.Setenv("MISBAH_CONFIG_DIR", tmpDir)
 
 	t.Run("non-existent config returns defaults", func(t *testing.T) {
 		config, err := LoadGlobalConfig()
@@ -63,16 +63,16 @@ func TestSaveGlobalConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 
 	// Save original env and restore after test
-	originalConfigDir := os.Getenv("JABAL_CONFIG_DIR")
+	originalConfigDir := os.Getenv("MISBAH_CONFIG_DIR")
 	defer func() {
 		if originalConfigDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", originalConfigDir)
+			os.Setenv("MISBAH_CONFIG_DIR", originalConfigDir)
 		} else {
-			os.Unsetenv("JABAL_CONFIG_DIR")
+			os.Unsetenv("MISBAH_CONFIG_DIR")
 		}
 	}()
 
-	os.Setenv("JABAL_CONFIG_DIR", tmpDir)
+	os.Setenv("MISBAH_CONFIG_DIR", tmpDir)
 
 	config := &GlobalConfig{
 		DefaultProvider: "aider",

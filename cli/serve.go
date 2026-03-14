@@ -7,7 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jabal/jabal/mcp"
+	"github.com/dpopsuev/misbah/mcp"
 	"github.com/spf13/cobra"
 )
 
@@ -20,24 +20,24 @@ var (
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start MCP server",
-	Long: `Start the jabal MCP (Model Context Protocol) server.
+	Long: `Start the misbah MCP (Model Context Protocol) server.
 
-The MCP server exposes jabal functionality via HTTP JSON-RPC for integration
+The MCP server exposes misbah functionality via HTTP JSON-RPC for integration
 with AI agents and automation tools.
 
 Available MCP tools:
-  - jabal_list_workspaces: List all workspaces
-  - jabal_create_workspace: Create a new workspace
-  - jabal_get_workspace: Get workspace details
-  - jabal_update_manifest: Update workspace manifest
-  - jabal_validate_workspace: Validate workspace
-  - jabal_get_status: Get workspace mount status
-  - jabal_list_providers: List available providers
+  - misbah_list_workspaces: List all workspaces
+  - misbah_create_workspace: Create a new workspace
+  - misbah_get_workspace: Get workspace details
+  - misbah_update_manifest: Update workspace manifest
+  - misbah_validate_workspace: Validate workspace
+  - misbah_get_status: Get workspace mount status
+  - misbah_list_providers: List available providers
 
 Examples:
-  jabal serve
-  jabal serve --port 8090
-  jabal serve --addr 0.0.0.0 --port 8080`,
+  misbah serve
+  misbah serve --port 8090
+  misbah serve --addr 0.0.0.0 --port 8080`,
 	RunE: runServe,
 }
 
@@ -49,7 +49,7 @@ func init() {
 func runServe(cmd *cobra.Command, args []string) error {
 	addr := fmt.Sprintf("%s:%d", serveAddr, servePort)
 
-	logger.Infof("Starting jabal MCP server on %s", addr)
+	logger.Infof("Starting misbah MCP server on %s", addr)
 
 	// Create MCP server
 	server := mcp.NewServer(logger, recorder)

@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/mount"
+	"github.com/dpopsuev/misbah/mount"
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +21,7 @@ This command displays whether a workspace is currently mounted, along with
 information about the provider, process ID, and mount time.
 
 Examples:
-  jabal summit -w myworkspace`,
+  misbah summit -w myworkspace`,
 	RunE: runSummit,
 }
 
@@ -59,7 +59,7 @@ func runSummit(cmd *cobra.Command, args []string) error {
 		if status.Stale {
 			logger.Warnf("")
 			logger.Warnf("⚠ Warning: Lock is stale (process no longer running)")
-			logger.Warnf("Run 'jabal unmount -w %s --force' to clean up", summitWorkspace)
+			logger.Warnf("Run 'misbah unmount -w %s --force' to clean up", summitWorkspace)
 		}
 	}
 

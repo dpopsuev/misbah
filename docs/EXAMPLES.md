@@ -6,10 +6,10 @@
 
 ```bash
 # Create a new workspace
-jabal create -w myproject
+misbah create -w myproject
 
 # Edit the manifest
-jabal edit -w myproject
+misbah edit -w myproject
 ```
 
 Add sources to the manifest:
@@ -34,16 +34,16 @@ Mount and launch:
 
 ```bash
 # Validate manifest
-jabal validate -w myproject
+misbah validate -w myproject
 
 # Mount with Claude Code
-jabal mount -w myproject -a claude
+misbah mount -w myproject -a claude
 ```
 
 Inside Claude, you'll have:
 
 ```
-/tmp/jabal/myproject/
+/tmp/misbah/myproject/
 ├── frontend/     # ~/Projects/frontend
 ├── backend/      # ~/Projects/backend
 └── shared/       # ~/Projects/shared
@@ -53,7 +53,7 @@ Inside Claude, you'll have:
 
 ```bash
 # List all workspaces
-jabal peaks
+misbah peaks
 
 # Output:
 # myproject (3 sources)
@@ -64,7 +64,7 @@ jabal peaks
 
 ```bash
 # From inside a mounted workspace
-jabal summit
+misbah summit
 
 # Output:
 # Workspace: myproject
@@ -77,10 +77,10 @@ jabal summit
 
 ```bash
 # Clean unmount (from outside the workspace)
-jabal unmount -w myproject
+misbah unmount -w myproject
 
 # Force unmount (terminates provider)
-jabal unmount -w myproject --force
+misbah unmount -w myproject --force
 ```
 
 ## Advanced Usage
@@ -110,10 +110,10 @@ Mount with different providers:
 
 ```bash
 # Use Claude Code
-jabal mount -w fullstack -a claude
+misbah mount -w fullstack -a claude
 
 # Or use Aider
-jabal mount -w fullstack -a aider
+misbah mount -w fullstack -a aider
 ```
 
 ### Workspace with Tags
@@ -247,7 +247,7 @@ providers:
 
 ```bash
 # Mount workspace
-jabal mount -w payment-platform -a claude
+misbah mount -w payment-platform -a claude
 
 # Inside Claude:
 # - Review API changes in api/
@@ -278,7 +278,7 @@ providers:
 **Workflow**:
 
 ```bash
-jabal mount -w ui-library -a claude
+misbah mount -w ui-library -a claude
 
 # Inside Claude:
 # - Modify component in lib/
@@ -307,7 +307,7 @@ sources:
 **Workflow**:
 
 ```bash
-jabal mount -w blog-platform -a claude
+misbah mount -w blog-platform -a claude
 
 # Inside Claude:
 # - Add new API endpoint in api/
@@ -334,7 +334,7 @@ providers:
       max_context_tokens: 200000
 ```
 
-Generates `~/.config/jabal/workspaces/{workspace}/.claude/settings.local.json`:
+Generates `~/.config/misbah/workspaces/{workspace}/.claude/settings.local.json`:
 
 ```json
 {
@@ -362,7 +362,7 @@ providers:
     edit-format: diff
 ```
 
-Generates `~/.config/jabal/workspaces/{workspace}/.aider/.aider.conf.yml`:
+Generates `~/.config/misbah/workspaces/{workspace}/.aider/.aider.conf.yml`:
 
 ```yaml
 model: gpt-4
@@ -376,18 +376,18 @@ edit-format: diff
 
 ```bash
 # Check who has the lock
-jabal summit -w myproject
+misbah summit -w myproject
 # Output: Locked by PID 12345 (user: dpopsuev)
 
 # Force unlock (terminates provider)
-jabal unmount -w myproject --force
+misbah unmount -w myproject --force
 ```
 
 ### Validation Errors
 
 ```bash
 # Validate before mounting
-jabal validate -w myproject
+misbah validate -w myproject
 
 # Example errors:
 # Error: Source path does not exist: ~/Projects/missing
@@ -399,14 +399,14 @@ jabal validate -w myproject
 
 ```bash
 # Enable verbose logging
-jabal mount -w myproject -a claude --log-level debug
+misbah mount -w myproject -a claude --log-level debug
 
 # Output:
-# [DEBUG] Loading manifest: ~/.config/jabal/workspaces/myproject/manifest.yaml
+# [DEBUG] Loading manifest: ~/.config/misbah/workspaces/myproject/manifest.yaml
 # [DEBUG] Validating 3 sources
-# [DEBUG] Acquiring lock: /tmp/jabal/.locks/myproject.lock
+# [DEBUG] Acquiring lock: /tmp/misbah/.locks/myproject.lock
 # [DEBUG] Creating namespace
-# [DEBUG] Mounting: ~/Projects/frontend -> /tmp/jabal/myproject/frontend
+# [DEBUG] Mounting: ~/Projects/frontend -> /tmp/misbah/myproject/frontend
 # ...
 ```
 
@@ -427,17 +427,17 @@ jabal mount -w myproject -a claude --log-level debug
 ### Provider Configuration
 
 - Keep provider-specific settings minimal
-- Let jabal generate configs (don't edit manually)
+- Let misbah generate configs (don't edit manually)
 - Use same manifest for multiple providers
 
 ### Performance
 
 - Limit sources to 5-10 per workspace (faster mount)
 - Use SSDs for source repositories (faster bind mounts)
-- Clean up unused workspaces (`jabal peaks` to review)
+- Clean up unused workspaces (`misbah peaks` to review)
 
 ### Safety
 
-- Always validate before mounting (`jabal validate`)
+- Always validate before mounting (`misbah validate`)
 - Use `--force` sparingly (can lose unsaved work)
-- Check `jabal summit` before force unmounting
+- Check `misbah summit` before force unmounting

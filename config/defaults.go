@@ -7,13 +7,13 @@ import (
 
 const (
 	// DefaultConfigDir is the default configuration directory.
-	DefaultConfigDir = ".config/jabal"
+	DefaultConfigDir = ".config/misbah"
 
 	// DefaultWorkspacesDir is the default workspaces directory.
 	DefaultWorkspacesDir = "workspaces"
 
 	// DefaultTempDir is the default temporary directory for mounts.
-	DefaultTempDir = "/tmp/jabal"
+	DefaultTempDir = "/tmp/misbah"
 
 	// DefaultLocksDir is the default directory for lock files.
 	DefaultLocksDir = ".locks"
@@ -24,7 +24,7 @@ const (
 
 // GetConfigDir returns the configuration directory path.
 func GetConfigDir() string {
-	if configDir := os.Getenv("JABAL_CONFIG_DIR"); configDir != "" {
+	if configDir := os.Getenv("MISBAH_CONFIG_DIR"); configDir != "" {
 		return configDir
 	}
 	homeDir, err := os.UserHomeDir()
@@ -51,7 +51,7 @@ func GetManifestPath(workspace string) string {
 
 // GetTempDir returns the temporary directory for mounts.
 func GetTempDir() string {
-	if tempDir := os.Getenv("JABAL_TEMP_DIR"); tempDir != "" {
+	if tempDir := os.Getenv("MISBAH_TEMP_DIR"); tempDir != "" {
 		return tempDir
 	}
 	return DefaultTempDir

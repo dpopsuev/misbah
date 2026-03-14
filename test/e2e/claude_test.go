@@ -12,14 +12,14 @@ import (
 	"time"
 )
 
-// TestClaudeCodeIntegration tests Jabal's integration with Claude Code CLI.
+// TestClaudeCodeIntegration tests Misbah's integration with Claude Code CLI.
 //
 // Requirements:
 // - claude binary in PATH
-// - JABAL_E2E_CLAUDE=true environment variable
+// - MISBAH_E2E_CLAUDE=true environment variable
 //
 // Run with:
-//   JABAL_E2E_CLAUDE=true go test -v -tags=e2e,claude ./test/e2e/
+//   MISBAH_E2E_CLAUDE=true go test -v -tags=e2e,claude ./test/e2e/
 func TestClaudeCodeIntegration(t *testing.T) {
 	// Runtime check 1: Binary exists
 	claudePath, err := exec.LookPath("claude")
@@ -29,13 +29,13 @@ func TestClaudeCodeIntegration(t *testing.T) {
 	t.Logf("Found claude at: %s", claudePath)
 
 	// Runtime check 2: Opt-in flag
-	if os.Getenv("JABAL_E2E_CLAUDE") != "true" {
-		t.Skip("JABAL_E2E_CLAUDE not set to 'true'")
+	if os.Getenv("MISBAH_E2E_CLAUDE") != "true" {
+		t.Skip("MISBAH_E2E_CLAUDE not set to 'true'")
 	}
 
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "jabal", "./cmd/jabal")
-	jabalBin := filepath.Join(root, "jabal")
+	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
+	jabalBin := filepath.Join(root, "misbah")
 
 	// Create isolated test workspace
 	workspaceDir := t.TempDir()
@@ -44,7 +44,7 @@ func TestClaudeCodeIntegration(t *testing.T) {
 	defer func() {
 		// Cleanup workspace
 		home, _ := os.UserHomeDir()
-		workspaceDir := filepath.Join(home, ".config/jabal/workspaces", workspaceName)
+		workspaceDir := filepath.Join(home, ".config/misbah/workspaces", workspaceName)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -134,13 +134,13 @@ func TestClaudeCodeWithMCP(t *testing.T) {
 	if _, err := exec.LookPath("claude"); err != nil {
 		t.Skip("claude binary not found in PATH")
 	}
-	if os.Getenv("JABAL_E2E_CLAUDE") != "true" {
-		t.Skip("JABAL_E2E_CLAUDE not set to 'true'")
+	if os.Getenv("MISBAH_E2E_CLAUDE") != "true" {
+		t.Skip("MISBAH_E2E_CLAUDE not set to 'true'")
 	}
 
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "jabal", "./cmd/jabal")
-	jabalBin := filepath.Join(root, "jabal")
+	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
+	jabalBin := filepath.Join(root, "misbah")
 
 	// Start MCP server
 	server := startMCPServer(t, jabalBin)
@@ -153,7 +153,7 @@ func TestClaudeCodeWithMCP(t *testing.T) {
 	defer func() {
 		// Cleanup workspace
 		home, _ := os.UserHomeDir()
-		workspaceDir := filepath.Join(home, ".config/jabal/workspaces", workspaceName)
+		workspaceDir := filepath.Join(home, ".config/misbah/workspaces", workspaceName)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -219,5 +219,5 @@ func getManifestPath(t *testing.T, workspaceName string) string {
 	if err != nil {
 		t.Fatalf("get home dir failed: %v", err)
 	}
-	return filepath.Join(home, ".config", "jabal", "workspaces", workspaceName, "manifest.yaml")
+	return filepath.Join(home, ".config", "misbah", "workspaces", workspaceName, "manifest.yaml")
 }

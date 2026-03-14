@@ -7,8 +7,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 )
 
 // NamespaceManager manages Linux namespaces.
@@ -49,7 +49,7 @@ func (nm *NamespaceManager) CreateNamespace(mountPath string, sources []model.So
 		set -e
 		%s
 		cd "%s"
-		export JABAL_WORKSPACE="%s"
+		export MISBAH_WORKSPACE="%s"
 		exec %s
 	`, mountScript, mountPath, mountPath, providerBinary)
 

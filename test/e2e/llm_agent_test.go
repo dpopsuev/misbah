@@ -21,7 +21,7 @@ const (
 	modelName     = "qwen2.5-coder:7b-instruct" // Can use qwen2.5:32b if available
 )
 
-// TestLLMAgentWorkflow tests jabal with an LLM agent (Qwen2.5-Coder via Ollama)
+// TestLLMAgentWorkflow tests misbah with an LLM agent (Qwen2.5-Coder via Ollama)
 func TestLLMAgentWorkflow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
@@ -54,10 +54,10 @@ func TestLLMAgentWorkflow(t *testing.T) {
 	defer func() {
 		// Cleanup workspace
 		// Try unmount, ignore errors (may not be mounted)
-		exec.Command("./jabal", "unmount", "-w", workspace, "--force").Run()
+		exec.Command("./misbah", "unmount", "-w", workspace, "--force").Run()
 
 		// Always clean workspace directory
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace)
+		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -68,7 +68,7 @@ func TestLLMAgentWorkflow(t *testing.T) {
 
 	// Test: Ask LLM to create a workspace manifest
 	t.Run("llm_create_manifest", func(t *testing.T) {
-		prompt := fmt.Sprintf(`You are helping test the jabal workspace manager.
+		prompt := fmt.Sprintf(`You are helping test the misbah workspace manager.
 
 Task: Create a YAML manifest for a workspace with these requirements:
 - Name: %s
@@ -83,7 +83,7 @@ Output ONLY the YAML manifest, nothing else.`, workspace, sourceA, sourceB)
 		manifest := queryLLM(t, prompt)
 
 		// Save the generated manifest
-		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace)
+		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
 		if err := os.MkdirAll(manifestPath, 0755); err != nil {
 			t.Fatalf("Failed to create workspace dir: %v", err)
 		}
@@ -98,18 +98,18 @@ Output ONLY the YAML manifest, nothing else.`, workspace, sourceA, sourceB)
 
 	// Test: Validate the LLM-generated manifest
 	t.Run("validate_llm_manifest", func(t *testing.T) {
-		run(t, "./jabal", "validate", "-w", workspace)
+		run(t, "./misbah", "validate", "-w", workspace)
 	})
 
 	// Test: Ask LLM to explain what the workspace does
 	t.Run("llm_explain_workspace", func(t *testing.T) {
-		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace, "manifest.yaml")
+		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace, "manifest.yaml")
 		manifestContent, err := os.ReadFile(manifestPath)
 		if err != nil {
 			t.Fatalf("Failed to read manifest: %v", err)
 		}
 
-		prompt := fmt.Sprintf(`Given this jabal workspace manifest:
+		prompt := fmt.Sprintf(`Given this misbah workspace manifest:
 
 %s
 

@@ -1,6 +1,6 @@
-# Jabal Testing Infrastructure
+# Misbah Testing Infrastructure
 
-This directory contains all tests for jabal, following the same patterns as Scribe, Lex, and Locus MCP servers.
+This directory contains all tests for misbah, following the same patterns as Scribe, Lex, and Locus MCP servers.
 
 ## Test Hierarchy
 
@@ -95,7 +95,7 @@ make test-e2e-llm
 - LLM explains workspace purpose
 
 #### LLM + MCP E2E Tests
-LLM agent interacting with jabal via MCP protocol:
+LLM agent interacting with misbah via MCP protocol:
 ```bash
 make test-e2e-llm-mcp
 ```
@@ -127,12 +127,12 @@ make test-e2e-container
 #### Claude Code E2E Tests
 Integration tests with Claude Code CLI:
 ```bash
-JABAL_E2E_CLAUDE=true make test-e2e-claude
+MISBAH_E2E_CLAUDE=true make test-e2e-claude
 ```
 
 **Requirements:**
 - Claude Code CLI binary in PATH (`claude`)
-- `JABAL_E2E_CLAUDE=true` environment variable (opt-in)
+- `MISBAH_E2E_CLAUDE=true` environment variable (opt-in)
 
 **What's tested:**
 - Workspace creation and validation
@@ -167,7 +167,7 @@ make test-e2e-mcp                     # MCP-based E2E tests
 make test-e2e-llm                     # LLM-driven E2E tests
 make test-e2e-llm-mcp                 # LLM + MCP E2E tests
 make test-e2e-container               # Containerized E2E tests
-JABAL_E2E_CLAUDE=true test-e2e-claude # Claude Code E2E tests
+MISBAH_E2E_CLAUDE=true test-e2e-claude # Claude Code E2E tests
 ```
 
 ### Coverage
@@ -203,15 +203,15 @@ ollama list | grep qwen
 LLM tests follow this pattern:
 1. Query Ollama API with structured prompt
 2. Parse LLM response
-3. Execute jabal commands with LLM output
+3. Execute misbah commands with LLM output
 4. Validate results
 
 Example:
 ```go
 prompt := "Create a YAML manifest for workspace 'test' with 2 sources..."
 manifest := queryLLM(t, prompt)
-// Save manifest, validate with jabal
-run(t, "./jabal", "validate", "-w", "test")
+// Save manifest, validate with misbah
+run(t, "./misbah", "validate", "-w", "test")
 ```
 
 ## Continuous Integration

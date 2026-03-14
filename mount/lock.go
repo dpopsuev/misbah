@@ -7,9 +7,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 )
 
 // LockManager manages workspace locks.

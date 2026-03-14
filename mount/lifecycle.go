@@ -3,10 +3,10 @@ package mount
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
-	"github.com/jabal/jabal/validate"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/validate"
 )
 
 // Lifecycle manages the complete workspace mount/unmount lifecycle.
@@ -94,9 +94,9 @@ func (lc *Lifecycle) Mount(workspace *model.Workspace, provider string, provider
 	lc.logger.Infof("Creating namespace and launching provider: %s", providerBinary)
 
 	env := []string{
-		fmt.Sprintf("JABAL_WORKSPACE=%s", workspace.Name),
-		fmt.Sprintf("JABAL_PROVIDER=%s", provider),
-		fmt.Sprintf("JABAL_LOCK_PID=%d", lock.PID),
+		fmt.Sprintf("MISBAH_WORKSPACE=%s", workspace.Name),
+		fmt.Sprintf("MISBAH_PROVIDER=%s", provider),
+		fmt.Sprintf("MISBAH_LOCK_PID=%d", lock.PID),
 	}
 
 	if err := lc.namespaceManager.CreateNamespace(mountPath, workspace.Sources, providerBinary, env); err != nil {

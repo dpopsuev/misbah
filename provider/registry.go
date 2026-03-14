@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/model"
 )
 
 // registry holds all registered providers.

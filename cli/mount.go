@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os/exec"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/model"
-	"github.com/jabal/jabal/mount"
-	"github.com/jabal/jabal/provider"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/provider"
 	"github.com/spf13/cobra"
 )
 
@@ -32,9 +32,9 @@ The mount command:
   6. Cleans up when the provider exits
 
 Examples:
-  jabal mount -w myworkspace -a claude
-  jabal mount -w project -a aider
-  jabal mount -w demo -a claude --log-level debug`,
+  misbah mount -w myworkspace -a claude
+  misbah mount -w project -a aider
+  misbah mount -w demo -a claude --log-level debug`,
 	RunE: runMount,
 }
 

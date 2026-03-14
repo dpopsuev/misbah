@@ -8,9 +8,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
-	"github.com/jabal/jabal/mount"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/mount"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

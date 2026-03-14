@@ -17,7 +17,7 @@ coverage.html
 go.work
 
 # Build artifacts
-/jabal
+/misbah
 /bin/
 /dist/
 

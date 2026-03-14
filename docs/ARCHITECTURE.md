@@ -2,13 +2,13 @@
 
 ## Overview
 
-Jabal uses Linux user namespaces and bind mounts to create unified workspaces from multiple source repositories. The core mechanism requires no root privileges and operates entirely in userspace.
+Misbah uses Linux user namespaces and bind mounts to create unified workspaces from multiple source repositories. The core mechanism requires no root privileges and operates entirely in userspace.
 
 ## Core Technology
 
 ### Linux Namespaces
 
-Jabal leverages three namespace types:
+Misbah leverages three namespace types:
 
 1. **User Namespace** (`--user`): Provides unprivileged container isolation
 2. **Mount Namespace** (`--mount`): Isolates filesystem mount points
@@ -18,18 +18,18 @@ Jabal leverages three namespace types:
 
 ```bash
 unshare --user --mount --map-root-user --pid --fork bash -c '
-  mkdir -p /tmp/jabal/{workspace}
-  mount --bind ~/Projects/repo-a /tmp/jabal/{workspace}/repo-a
-  mount --bind ~/Projects/repo-b /tmp/jabal/{workspace}/repo-b
-  mount --bind ~/.config/jabal/workspaces/{workspace}/.claude /tmp/jabal/{workspace}/.claude
-  cd /tmp/jabal/{workspace}
+  mkdir -p /tmp/misbah/{workspace}
+  mount --bind ~/Projects/repo-a /tmp/misbah/{workspace}/repo-a
+  mount --bind ~/Projects/repo-b /tmp/misbah/{workspace}/repo-b
+  mount --bind ~/.config/misbah/workspaces/{workspace}/.claude /tmp/misbah/{workspace}/.claude
+  cd /tmp/misbah/{workspace}
   exec claude
 '
 ```
 
 ## Package Structure
 
-Jabal follows a layered architecture with clear dependency flow:
+Misbah follows a layered architecture with clear dependency flow:
 
 ```
 model (core domain types)
@@ -64,7 +64,7 @@ Core domain types with no external dependencies (except stdlib and YAML):
 
 Global configuration management:
 
-- Load `~/.config/jabal/config.yaml`
+- Load `~/.config/misbah/config.yaml`
 - Path resolution (`~`, `$HOME`)
 - Default values
 
@@ -128,7 +128,7 @@ Structured logging and instrumentation:
 ### Mount Operation
 
 ```
-User: jabal mount -w myworkspace -a claude
+User: misbah mount -w myworkspace -a claude
   ↓
 CLI: Parse args → Load manifest
   ↓
@@ -166,7 +166,7 @@ Mount: Wait for child exit → Cleanup
 ## File Layout
 
 ```
-~/.config/jabal/
+~/.config/misbah/
 ├── config.yaml                      # Global config
 └── workspaces/
     ├── workspace-a/
@@ -176,7 +176,7 @@ Mount: Wait for child exit → Cleanup
     └── workspace-b/
         └── manifest.yaml
 
-/tmp/jabal/
+/tmp/misbah/
 ├── .locks/
 │   ├── workspace-a.lock             # Lock files (PID, timestamp)
 │   └── workspace-b.lock
@@ -210,7 +210,7 @@ Mount: Wait for child exit → Cleanup
 ### Force Termination
 
 ```bash
-jabal unmount -w myworkspace --force
+misbah unmount -w myworkspace --force
   → SIGTERM to PID
   → Wait 5s
   → SIGKILL if still alive

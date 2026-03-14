@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/metrics"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/metrics"
 	"github.com/spf13/cobra"
 )
 
@@ -23,17 +23,17 @@ var (
 
 // rootCmd represents the base command when called without any subcommands.
 var rootCmd = &cobra.Command{
-	Use:   "jabal",
-	Short: "Jabal - Workspace manager for CLI AI agents",
-	Long: `Jabal creates unified workspaces from multiple source repositories using
+	Use:   "misbah",
+	Short: "Misbah - Workspace manager for CLI AI agents",
+	Long: `Misbah creates unified workspaces from multiple source repositories using
 Linux user namespaces and bind mounts, enabling CLI AI agents to work
 seamlessly across project boundaries.
 
 Examples:
-  jabal create -w myworkspace
-  jabal mount -w myworkspace -a claude
-  jabal peaks
-  jabal summit`,
+  misbah create -w myworkspace
+  misbah mount -w myworkspace -a claude
+  misbah peaks
+  misbah summit`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
 		level := metrics.LogLevel(logLevel)
@@ -57,7 +57,7 @@ Examples:
 
 		// Override config dir if specified
 		if configDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", configDir)
+			os.Setenv("MISBAH_CONFIG_DIR", configDir)
 		}
 
 		return nil
@@ -72,7 +72,7 @@ func Execute() error {
 func init() {
 	// Global flags
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
-	rootCmd.PersistentFlags().StringVar(&configDir, "config-dir", "", "Configuration directory (default: ~/.config/jabal)")
+	rootCmd.PersistentFlags().StringVar(&configDir, "config-dir", "", "Configuration directory (default: ~/.config/misbah)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output (same as --log-level=debug)")
 
 	// Add commands
@@ -121,10 +121,10 @@ func HandleError(err error) {
 // versionCmd represents the version command.
 var versionCmd = &cobra.Command{
 	Use:   "version",
-	Short: "Print the version number of jabal",
-	Long:  "Print the version number and build information for jabal.",
+	Short: "Print the version number of misbah",
+	Long:  "Print the version number and build information for misbah.",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("jabal version 0.1.0")
+		fmt.Println("misbah version 0.1.0")
 		fmt.Println("A workspace manager for CLI AI agents")
 	},
 }

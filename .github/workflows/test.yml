@@ -100,5 +100,5 @@ jobs:
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
-        name: jabal-linux-amd64
-        path: bin/jabal
+        name: misbah-linux-amd64
+        path: bin/misbah

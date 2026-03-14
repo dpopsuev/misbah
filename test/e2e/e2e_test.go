@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	testImage     = "jabal-e2e-test"
-	testContainer = "jabal-e2e-test"
+	testImage     = "misbah-e2e-test"
+	testContainer = "misbah-e2e-test"
 )
 
 // TestBasicWorkflow tests the complete workspace lifecycle without LLM
@@ -23,9 +23,9 @@ func TestBasicWorkflow(t *testing.T) {
 		t.Skip("E2E tests require Linux")
 	}
 
-	// Build jabal binary
+	// Build misbah binary
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "jabal", "./cmd/jabal")
+	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
 
 	// Setup
 	workspace := "e2e-test-" + time.Now().Format("20060102-150405")
@@ -49,7 +49,7 @@ func TestBasicWorkflow(t *testing.T) {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 
-	jabalBin := filepath.Join(root, "jabal")
+	jabalBin := filepath.Join(root, "misbah")
 
 	defer func() {
 		// Cleanup workspace
@@ -57,7 +57,7 @@ func TestBasicWorkflow(t *testing.T) {
 		exec.Command(jabalBin, "unmount", "-w", workspace, "--force").Run()
 
 		// Always clean workspace directory
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace)
+		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -71,7 +71,7 @@ func TestBasicWorkflow(t *testing.T) {
 	})
 
 	t.Run("edit_manifest", func(t *testing.T) {
-		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace, "manifest.yaml")
+		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace, "manifest.yaml")
 		manifest := `name: ` + workspace + `
 description: E2E test workspace
 sources:
@@ -108,7 +108,7 @@ providers:
 	})
 }
 
-// TestContainerizedWorkflow tests jabal inside a container
+// TestContainerizedWorkflow tests misbah inside a container
 func TestContainerizedWorkflow(t *testing.T) {
 	if testing.Short() {
 		t.Skip("Skipping container tests in short mode")
@@ -125,7 +125,7 @@ func TestContainerizedWorkflow(t *testing.T) {
 		if err != nil {
 			t.Fatalf("version command failed: %v\n%s", err, out)
 		}
-		if !strings.Contains(string(out), "jabal version") {
+		if !strings.Contains(string(out), "misbah version") {
 			t.Fatalf("Unexpected version output: %s", out)
 		}
 	})

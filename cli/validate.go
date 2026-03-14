@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/validate"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/validate"
 	"github.com/spf13/cobra"
 )
 
@@ -28,7 +28,7 @@ This command checks:
   - No wildcard characters in paths
 
 Examples:
-  jabal validate -w myworkspace`,
+  misbah validate -w myworkspace`,
 	RunE: runValidate,
 }
 

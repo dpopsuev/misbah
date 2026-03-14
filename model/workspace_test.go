@@ -111,22 +111,22 @@ func TestWorkspaceValidate(t *testing.T) {
 func TestWorkspaceGetMountPath(t *testing.T) {
 	workspace := &Workspace{Name: "test-workspace"}
 	mountPath := workspace.GetMountPath()
-	assert.Equal(t, "/tmp/jabal/test-workspace", mountPath)
+	assert.Equal(t, "/tmp/misbah/test-workspace", mountPath)
 }
 
 func TestWorkspaceGetLockPath(t *testing.T) {
 	workspace := &Workspace{Name: "test-workspace"}
 	lockPath := workspace.GetLockPath()
-	assert.Equal(t, "/tmp/jabal/.locks/test-workspace.lock", lockPath)
+	assert.Equal(t, "/tmp/misbah/.locks/test-workspace.lock", lockPath)
 }
 
 func TestWorkspaceGetProviderConfigDir(t *testing.T) {
 	workspace := &Workspace{
 		Name:         "test-workspace",
-		ManifestPath: "/home/user/.config/jabal/workspaces/test-workspace/manifest.yaml",
+		ManifestPath: "/home/user/.config/misbah/workspaces/test-workspace/manifest.yaml",
 	}
 	configDir := workspace.GetProviderConfigDir("claude")
-	assert.Equal(t, "/home/user/.config/jabal/workspaces/test-workspace/.claude", configDir)
+	assert.Equal(t, "/home/user/.config/misbah/workspaces/test-workspace/.claude", configDir)
 }
 
 func TestWorkspaceHasProvider(t *testing.T) {

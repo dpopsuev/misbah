@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/spf13/cobra"
 )
 
@@ -14,10 +14,10 @@ var peaksCmd = &cobra.Command{
 	Short: "List all workspaces",
 	Long: `List all available workspaces.
 
-This command shows all workspaces found in ~/.config/jabal/workspaces/
+This command shows all workspaces found in ~/.config/misbah/workspaces/
 
 Examples:
-  jabal peaks`,
+  misbah peaks`,
 	RunE: runPeaks,
 }
 
@@ -32,7 +32,7 @@ func runPeaks(cmd *cobra.Command, args []string) error {
 
 	if len(workspaces) == 0 {
 		logger.Infof("No workspaces found.")
-		logger.Infof("Create one with: jabal create -w myworkspace")
+		logger.Infof("Create one with: misbah create -w myworkspace")
 		return nil
 	}
 

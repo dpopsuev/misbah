@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 )
 
 // BindMounter handles bind mount operations.

@@ -1,10 +1,10 @@
-# Jabal
+# Misbah
 
 A workspace manager for CLI AI agents that enables multi-repository development through Linux user namespaces and bind mounts.
 
 ## Overview
 
-CLI AI agents (Claude Code, Aider, Cursor) are currently bound to a single working directory. Jabal solves this by creating unified workspaces from multiple source repositories using Linux namespaces, allowing agents to seamlessly work across project boundaries.
+CLI AI agents (Claude Code, Aider, Cursor) are currently bound to a single working directory. Misbah solves this by creating unified workspaces from multiple source repositories using Linux namespaces, allowing agents to seamlessly work across project boundaries.
 
 ## Features
 
@@ -31,35 +31,35 @@ CLI AI agents (Claude Code, Aider, Cursor) are currently bound to a single worki
 make install
 
 # Create a workspace manifest
-jabal create -w myworkspace
+misbah create -w myworkspace
 
 # Edit the manifest to add sources
-jabal edit -w myworkspace
+misbah edit -w myworkspace
 
 # Mount and launch Claude Code
-jabal mount -w myworkspace -a claude
+misbah mount -w myworkspace -a claude
 
 # List workspaces
-jabal peaks
+misbah peaks
 
 # Current workspace status
-jabal summit
+misbah summit
 ```
 
 ### MCP Server Usage
 
 ```bash
 # Start MCP server
-jabal serve --port 8080
+misbah serve --port 8080
 
 # MCP server provides these tools for AI agents:
-# - jabal_list_workspaces
-# - jabal_create_workspace
-# - jabal_get_workspace
-# - jabal_update_manifest
-# - jabal_validate_workspace
-# - jabal_get_status
-# - jabal_list_providers
+# - misbah_list_workspaces
+# - misbah_create_workspace
+# - misbah_get_workspace
+# - misbah_update_manifest
+# - misbah_validate_workspace
+# - misbah_get_status
+# - misbah_list_providers
 
 # Test MCP server
 curl -X POST http://localhost:8080 \

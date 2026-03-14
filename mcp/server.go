@@ -6,15 +6,15 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
-	"github.com/jabal/jabal/mount"
-	"github.com/jabal/jabal/provider"
-	"github.com/jabal/jabal/validate"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/provider"
+	"github.com/dpopsuev/misbah/validate"
 )
 
-// Server implements the MCP (Model Context Protocol) server for jabal.
+// Server implements the MCP (Model Context Protocol) server for misbah.
 type Server struct {
 	logger    *metrics.Logger
 	recorder  *metrics.MetricsRecorder
@@ -148,7 +148,7 @@ func (s *Server) handleInitialize(ctx context.Context, params json.RawMessage) (
 			},
 		},
 		ServerInfo: ServerInfo{
-			Name:    "jabal",
+			Name:    "misbah",
 			Version: "0.1.0",
 		},
 	}, nil
@@ -157,12 +157,12 @@ func (s *Server) handleInitialize(ctx context.Context, params json.RawMessage) (
 func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 	tools := []Tool{
 		{
-			Name:        "jabal_list_workspaces",
+			Name:        "misbah_list_workspaces",
 			Description: "List all available workspaces",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
 		},
 		{
-			Name:        "jabal_create_workspace",
+			Name:        "misbah_create_workspace",
 			Description: "Create a new workspace",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -174,7 +174,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "jabal_get_workspace",
+			Name:        "misbah_get_workspace",
 			Description: "Get workspace details including manifest",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -185,7 +185,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "jabal_update_manifest",
+			Name:        "misbah_update_manifest",
 			Description: "Update workspace manifest",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -197,7 +197,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "jabal_validate_workspace",
+			Name:        "misbah_validate_workspace",
 			Description: "Validate a workspace manifest",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -208,7 +208,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "jabal_get_status",
+			Name:        "misbah_get_status",
 			Description: "Get workspace mount status",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -219,7 +219,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "jabal_list_providers",
+			Name:        "misbah_list_providers",
 			Description: "List available providers (claude, aider, cursor)",
 			InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
 		},
@@ -245,19 +245,19 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	s.logger.Debugf("MCP tool call: %s", call.Name)
 
 	switch call.Name {
-	case "jabal_list_workspaces":
+	case "misbah_list_workspaces":
 		return s.toolListWorkspaces(ctx, call.Arguments)
-	case "jabal_create_workspace":
+	case "misbah_create_workspace":
 		return s.toolCreateWorkspace(ctx, call.Arguments)
-	case "jabal_get_workspace":
+	case "misbah_get_workspace":
 		return s.toolGetWorkspace(ctx, call.Arguments)
-	case "jabal_update_manifest":
+	case "misbah_update_manifest":
 		return s.toolUpdateManifest(ctx, call.Arguments)
-	case "jabal_validate_workspace":
+	case "misbah_validate_workspace":
 		return s.toolValidateWorkspace(ctx, call.Arguments)
-	case "jabal_get_status":
+	case "misbah_get_status":
 		return s.toolGetStatus(ctx, call.Arguments)
-	case "jabal_list_providers":
+	case "misbah_list_providers":
 		return s.toolListProviders(ctx, call.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", call.Name)

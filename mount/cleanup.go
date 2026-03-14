@@ -5,7 +5,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/jabal/jabal/metrics"
+	"github.com/dpopsuev/misbah/metrics"
 )
 
 // CleanupHandler handles cleanup on signals.

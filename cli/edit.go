@@ -5,7 +5,7 @@ import (
 	"os"
 	"os/exec"
 
-	"github.com/jabal/jabal/config"
+	"github.com/dpopsuev/misbah/config"
 	"github.com/spf13/cobra"
 )
 
@@ -23,8 +23,8 @@ var editCmd = &cobra.Command{
 The editor is determined by the EDITOR environment variable, or falls back to vi.
 
 Examples:
-  jabal edit -w myworkspace
-  jabal edit -w myworkspace --editor nano`,
+  misbah edit -w myworkspace
+  misbah edit -w myworkspace --editor nano`,
 	RunE: runEdit,
 }
 
@@ -67,7 +67,7 @@ func runEdit(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("editor exited with error: %w", err)
 	}
 
-	logger.Infof("Manifest saved. Run 'jabal validate -w %s' to validate changes.", editWorkspace)
+	logger.Infof("Manifest saved. Run 'misbah validate -w %s' to validate changes.", editWorkspace)
 
 	return nil
 }

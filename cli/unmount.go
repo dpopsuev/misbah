@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/mount"
+	"github.com/dpopsuev/misbah/mount"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +22,8 @@ If the workspace is currently mounted, this command will attempt to release
 the lock gracefully. Use --force to forcefully terminate the provider process.
 
 Examples:
-  jabal unmount -w myworkspace
-  jabal unmount -w myworkspace --force`,
+  misbah unmount -w myworkspace
+  misbah unmount -w myworkspace --force`,
 	RunE: runUnmount,
 }
 

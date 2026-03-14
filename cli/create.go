@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/config"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/spf13/cobra"
 )
 
@@ -22,8 +22,8 @@ var createCmd = &cobra.Command{
 This command creates a minimal workspace manifest that you can edit to add sources.
 
 Examples:
-  jabal create -w myworkspace
-  jabal create -w myworkspace --description "My project workspace"`,
+  misbah create -w myworkspace
+  misbah create -w myworkspace --description "My project workspace"`,
 	RunE: runCreate,
 }
 
@@ -71,9 +71,9 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	logger.Infof("Manifest saved to: %s", manifestPath)
 	logger.Infof("")
 	logger.Infof("Next steps:")
-	logger.Infof("  1. Edit the manifest: jabal edit -w %s", createWorkspace)
+	logger.Infof("  1. Edit the manifest: misbah edit -w %s", createWorkspace)
 	logger.Infof("  2. Add source directories")
-	logger.Infof("  3. Mount the workspace: jabal mount -w %s -a claude", createWorkspace)
+	logger.Infof("  3. Mount the workspace: misbah mount -w %s -a claude", createWorkspace)
 
 	return nil
 }

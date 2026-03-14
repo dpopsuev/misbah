@@ -3,7 +3,7 @@ package validate
 import (
 	"fmt"
 
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/model"
 	"gopkg.in/yaml.v3"
 )
 

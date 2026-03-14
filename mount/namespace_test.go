@@ -4,8 +4,8 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -41,13 +41,13 @@ func TestNamespaceManagerBuildMountScript(t *testing.T) {
 		{Path: "/tmp/source2", Mount: "source2"},
 	}
 
-	script := nm.buildMountScript("/tmp/jabal/test", sources)
+	script := nm.buildMountScript("/tmp/misbah/test", sources)
 
-	assert.Contains(t, script, "mkdir -p \"/tmp/jabal/test\"")
-	assert.Contains(t, script, "mkdir -p \"/tmp/jabal/test/source1\"")
-	assert.Contains(t, script, "mount --bind \"/tmp/source1\" \"/tmp/jabal/test/source1\"")
-	assert.Contains(t, script, "mkdir -p \"/tmp/jabal/test/source2\"")
-	assert.Contains(t, script, "mount --bind \"/tmp/source2\" \"/tmp/jabal/test/source2\"")
+	assert.Contains(t, script, "mkdir -p \"/tmp/misbah/test\"")
+	assert.Contains(t, script, "mkdir -p \"/tmp/misbah/test/source1\"")
+	assert.Contains(t, script, "mount --bind \"/tmp/source1\" \"/tmp/misbah/test/source1\"")
+	assert.Contains(t, script, "mkdir -p \"/tmp/misbah/test/source2\"")
+	assert.Contains(t, script, "mount --bind \"/tmp/source2\" \"/tmp/misbah/test/source2\"")
 }
 
 func TestNamespaceManagerCreateNamespace(t *testing.T) {

@@ -21,18 +21,18 @@ const (
 	mcpAddr = "http://localhost:18080"
 )
 
-// TestMCPWorkflow tests jabal via MCP server
+// TestMCPWorkflow tests misbah via MCP server
 func TestMCPWorkflow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
 	}
 
-	// Build jabal
+	// Build misbah
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "jabal", "./cmd/jabal")
+	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
 
 	// Start MCP server
-	jabalBin := filepath.Join(root, "jabal")
+	jabalBin := filepath.Join(root, "misbah")
 	server := startMCPServer(t, jabalBin)
 	defer server.Process.Kill()
 
@@ -54,7 +54,7 @@ func TestMCPWorkflow(t *testing.T) {
 
 	defer func() {
 		// Cleanup workspace
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace)
+		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -74,7 +74,7 @@ func TestMCPWorkflow(t *testing.T) {
 		})
 
 		serverInfo := result["serverInfo"].(map[string]interface{})
-		assert(t, serverInfo["name"] == "jabal", "Server name should be 'jabal'")
+		assert(t, serverInfo["name"] == "misbah", "Server name should be 'misbah'")
 		assert(t, serverInfo["version"] == "0.1.0", "Server version should be '0.1.0'")
 	})
 

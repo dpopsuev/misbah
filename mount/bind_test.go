@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/jabal/jabal/metrics"
-	"github.com/jabal/jabal/model"
+	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -42,27 +42,27 @@ echo "kernel.unprivileged_userns_clone = 1" | sudo tee -a /etc/sysctl.conf
 
 ```bash
 # Clone repository
-git clone https://github.com/jabal/jabal.git
-cd jabal
+git clone https://github.com/misbah/misbah.git
+cd misbah
 
 # Build and install
 make install
 
 # Verify installation
-jabal --version
+misbah --version
 ```
 
 ### Pre-built Binary
 
 ```bash
 # Download latest release
-curl -L https://github.com/jabal/jabal/releases/latest/download/jabal-linux-amd64 -o jabal
+curl -L https://github.com/misbah/misbah/releases/latest/download/misbah-linux-amd64 -o misbah
 
 # Make executable
-chmod +x jabal
+chmod +x misbah
 
 # Move to PATH
-sudo mv jabal /usr/local/bin/
+sudo mv misbah /usr/local/bin/
 ```
 
 ## Post-Installation
@@ -71,21 +71,21 @@ sudo mv jabal /usr/local/bin/
 
 ```bash
 # Bash
-jabal completion bash | sudo tee /etc/bash_completion.d/jabal
+misbah completion bash | sudo tee /etc/bash_completion.d/misbah
 
 # Zsh
-jabal completion zsh > "${fpath[1]}/_jabal"
+misbah completion zsh > "${fpath[1]}/_misbah"
 
 # Fish
-jabal completion fish > ~/.config/fish/completions/jabal.fish
+misbah completion fish > ~/.config/fish/completions/misbah.fish
 ```
 
 ### Configuration Directory
 
-Jabal stores configuration in `~/.config/jabal/`:
+Misbah stores configuration in `~/.config/misbah/`:
 
 ```bash
-mkdir -p ~/.config/jabal/workspaces
+mkdir -p ~/.config/misbah/workspaces
 ```
 
 ## Verification
@@ -94,13 +94,13 @@ Test your installation:
 
 ```bash
 # Create test workspace
-jabal create -w test
+misbah create -w test
 
 # Verify manifest was created
-ls ~/.config/jabal/workspaces/test/manifest.yaml
+ls ~/.config/misbah/workspaces/test/manifest.yaml
 
 # Validate manifest
-jabal validate -w test
+misbah validate -w test
 ```
 
 ## Troubleshooting

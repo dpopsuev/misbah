@@ -2,7 +2,7 @@ package model
 
 import "errors"
 
-// Domain errors for the jabal system.
+// Domain errors for the misbah system.
 var (
 	// ErrWorkspaceNotFound is returned when a workspace cannot be found.
 	ErrWorkspaceNotFound = errors.New("workspace not found")

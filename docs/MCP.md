@@ -1,10 +1,10 @@
 # MCP Server Integration
 
-Jabal provides a Model Context Protocol (MCP) server for seamless integration with AI agents and automation tools.
+Misbah provides a Model Context Protocol (MCP) server for seamless integration with AI agents and automation tools.
 
 ## Overview
 
-The MCP server exposes jabal functionality via HTTP JSON-RPC, making it easy for AI agents to:
+The MCP server exposes misbah functionality via HTTP JSON-RPC, making it easy for AI agents to:
 - Discover and manage workspaces
 - Create and update manifests
 - Validate configurations
@@ -15,18 +15,18 @@ The MCP server exposes jabal functionality via HTTP JSON-RPC, making it easy for
 
 ```bash
 # Default (localhost:8080)
-jabal serve
+misbah serve
 
 # Custom address/port
-jabal serve --addr 0.0.0.0 --port 9000
+misbah serve --addr 0.0.0.0 --port 9000
 
 # With debug logging
-jabal serve --verbose
+misbah serve --verbose
 ```
 
 ## MCP Protocol
 
-Jabal implements **MCP 2024-11-05** specification.
+Misbah implements **MCP 2024-11-05** specification.
 
 ### Initialization
 
@@ -59,7 +59,7 @@ Response:
       "tools": {}
     },
     "serverInfo": {
-      "name": "jabal",
+      "name": "misbah",
       "version": "0.1.0"
     }
   }
@@ -77,7 +77,7 @@ Returns all available MCP tools with their schemas.
 
 ## Available MCP Tools
 
-### jabal_list_workspaces
+### misbah_list_workspaces
 
 List all available workspaces.
 
@@ -91,7 +91,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_list_workspaces",
+      "name": "misbah_list_workspaces",
       "arguments": {}
     }
   }'
@@ -107,7 +107,7 @@ curl -X POST http://localhost:8080 \
 }
 ```
 
-### jabal_create_workspace
+### misbah_create_workspace
 
 Create a new workspace.
 
@@ -123,7 +123,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_create_workspace",
+      "name": "misbah_create_workspace",
       "arguments": {
         "name": "myproject",
         "description": "My awesome project"
@@ -137,12 +137,12 @@ curl -X POST http://localhost:8080 \
 {
   "content": [{
     "type": "text",
-    "text": "✓ Workspace 'myproject' created successfully at /home/user/.config/jabal/workspaces/myproject/manifest.yaml"
+    "text": "✓ Workspace 'myproject' created successfully at /home/user/.config/misbah/workspaces/myproject/manifest.yaml"
   }]
 }
 ```
 
-### jabal_get_workspace
+### misbah_get_workspace
 
 Get workspace details including full manifest.
 
@@ -157,7 +157,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_get_workspace",
+      "name": "misbah_get_workspace",
       "arguments": {
         "name": "myproject"
       }
@@ -175,7 +175,7 @@ curl -X POST http://localhost:8080 \
 }
 ```
 
-### jabal_update_manifest
+### misbah_update_manifest
 
 Update workspace manifest.
 
@@ -191,7 +191,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_update_manifest",
+      "name": "misbah_update_manifest",
       "arguments": {
         "name": "myproject",
         "manifest": {
@@ -214,7 +214,7 @@ curl -X POST http://localhost:8080 \
   }'
 ```
 
-### jabal_validate_workspace
+### misbah_validate_workspace
 
 Validate a workspace manifest.
 
@@ -229,7 +229,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_validate_workspace",
+      "name": "misbah_validate_workspace",
       "arguments": {
         "name": "myproject"
       }
@@ -248,7 +248,7 @@ curl -X POST http://localhost:8080 \
 }
 ```
 
-### jabal_get_status
+### misbah_get_status
 
 Get workspace mount status.
 
@@ -263,7 +263,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_get_status",
+      "name": "misbah_get_status",
       "arguments": {
         "name": "myproject"
       }
@@ -281,7 +281,7 @@ curl -X POST http://localhost:8080 \
 }
 ```
 
-### jabal_list_providers
+### misbah_list_providers
 
 List available providers (claude, aider, cursor).
 
@@ -295,7 +295,7 @@ curl -X POST http://localhost:8080 \
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "jabal_list_providers",
+      "name": "misbah_list_providers",
       "arguments": {}
     }
   }'
@@ -337,7 +337,7 @@ Add to `.claude/settings.json`:
 ```json
 {
   "mcpServers": {
-    "jabal": {
+    "misbah": {
       "url": "http://localhost:8080"
     }
   }
@@ -349,7 +349,7 @@ Add to `.claude/settings.json`:
 ```python
 import requests
 
-def call_jabal_tool(tool_name, arguments):
+def call_misbah_tool(tool_name, arguments):
     response = requests.post("http://localhost:8080", json={
         "jsonrpc": "2.0",
         "id": 1,
@@ -362,11 +362,11 @@ def call_jabal_tool(tool_name, arguments):
     return response.json()["result"]
 
 # List workspaces
-workspaces = call_jabal_tool("jabal_list_workspaces", {})
+workspaces = call_misbah_tool("misbah_list_workspaces", {})
 print(workspaces)
 
 # Create workspace
-result = call_jabal_tool("jabal_create_workspace", {
+result = call_misbah_tool("misbah_create_workspace", {
     "name": "my-project",
     "description": "My awesome project"
 })
@@ -391,7 +391,7 @@ type MCPRequest struct {
     Params  interface{} `json:"params"`
 }
 
-func callJabalTool(tool string, args map[string]interface{}) (map[string]interface{}, error) {
+func callMisbahTool(tool string, args map[string]interface{}) (map[string]interface{}, error) {
     req := MCPRequest{
         JSONRPC: "2.0",
         ID:      1,
@@ -421,10 +421,10 @@ func callJabalTool(tool string, args map[string]interface{}) (map[string]interfa
 
 ```bash
 # AI agent creates workspace
-jabal_create_workspace(name="feature-x")
+misbah_create_workspace(name="feature-x")
 
 # AI agent adds sources
-jabal_update_manifest(
+misbah_update_manifest(
     name="feature-x",
     manifest={
         "sources": [
@@ -435,7 +435,7 @@ jabal_update_manifest(
 )
 
 # AI agent validates
-jabal_validate_workspace(name="feature-x")
+misbah_validate_workspace(name="feature-x")
 ```
 
 ### Multi-Repository Analysis
@@ -464,7 +464,7 @@ For production use:
 Enable debug logging:
 
 ```bash
-jabal serve --verbose
+misbah serve --verbose
 ```
 
 Test with verbose curl:
@@ -478,10 +478,10 @@ curl -v -X POST http://localhost:8080 \
 
 | Task | CLI | MCP |
 |------|-----|-----|
-| List workspaces | `jabal peaks` | `jabal_list_workspaces()` |
-| Create workspace | `jabal create -w test` | `jabal_create_workspace(name="test")` |
-| Validate | `jabal validate -w test` | `jabal_validate_workspace(name="test")` |
-| Get status | `jabal summit -w test` | `jabal_get_status(name="test")` |
+| List workspaces | `misbah peaks` | `misbah_list_workspaces()` |
+| Create workspace | `misbah create -w test` | `misbah_create_workspace(name="test")` |
+| Validate | `misbah validate -w test` | `misbah_validate_workspace(name="test")` |
+| Get status | `misbah summit -w test` | `misbah_get_status(name="test")` |
 
 **Advantages of MCP:**
 - Structured JSON responses (no text parsing)

@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-// TestLLMWithMCP tests LLM agent interacting with jabal via MCP
+// TestLLMWithMCP tests LLM agent interacting with misbah via MCP
 func TestLLMWithMCP(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
@@ -37,9 +37,9 @@ func TestLLMWithMCP(t *testing.T) {
 
 	// Build and start MCP server
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "jabal", "./cmd/jabal")
+	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
 
-	jabalBin := filepath.Join(root, "jabal")
+	jabalBin := filepath.Join(root, "misbah")
 	server := startMCPServer(t, jabalBin)
 	defer server.Process.Kill()
 
@@ -60,7 +60,7 @@ func TestLLMWithMCP(t *testing.T) {
 
 	defer func() {
 		// Cleanup workspace
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", workspace)
+		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
 		os.RemoveAll(workspaceDir)
 
 		// Assert cleanup worked
@@ -71,7 +71,7 @@ func TestLLMWithMCP(t *testing.T) {
 
 	// Test: LLM discovers MCP tools
 	t.Run("llm_discover_tools", func(t *testing.T) {
-		prompt := `You are testing the jabal workspace manager via MCP protocol.
+		prompt := `You are testing the misbah workspace manager via MCP protocol.
 
 The MCP server is running at http://localhost:18080
 
@@ -98,7 +98,7 @@ Respond with a JSON-RPC request to list the tools. Output ONLY the JSON request,
 
 	// Test: LLM creates workspace via MCP
 	t.Run("llm_create_workspace", func(t *testing.T) {
-		prompt := fmt.Sprintf(`You are testing the jabal workspace manager via MCP protocol.
+		prompt := fmt.Sprintf(`You are testing the misbah workspace manager via MCP protocol.
 
 Task: Create a workspace named "%s" with description "LLM-managed test workspace" using the jabal_create_workspace tool.
 
@@ -122,7 +122,7 @@ Generate a JSON-RPC request to call this tool. Output ONLY the JSON request, not
 
 	// Test: LLM generates manifest
 	t.Run("llm_generate_manifest", func(t *testing.T) {
-		prompt := fmt.Sprintf(`You are testing the jabal workspace manager.
+		prompt := fmt.Sprintf(`You are testing the misbah workspace manager.
 
 Task: Generate a workspace manifest JSON object with:
 - name: %s
@@ -162,7 +162,7 @@ Output ONLY the manifest JSON object (not the full MCP request), nothing else.`,
 		})
 		manifestJSON := getToolContent(t, result)
 
-		prompt := fmt.Sprintf(`You are reviewing a jabal workspace configuration.
+		prompt := fmt.Sprintf(`You are reviewing a misbah workspace configuration.
 
 Workspace manifest:
 %s
@@ -209,9 +209,9 @@ Purpose: [one sentence summary]`, manifestJSON)
 		})
 
 		errorMsg := getToolContent(t, result)
-		t.Logf("Error from jabal: %s", errorMsg)
+		t.Logf("Error from misbah: %s", errorMsg)
 
-		prompt := fmt.Sprintf(`You are debugging a jabal workspace error.
+		prompt := fmt.Sprintf(`You are debugging a misbah workspace error.
 
 Error message:
 %s
@@ -227,7 +227,7 @@ Task: Explain what the problem is and how to fix it.`, errorMsg)
 			     strings.Contains(strings.ToLower(response), "unique"), "LLM should identify duplicate issue")
 
 		// Cleanup
-		os.RemoveAll(filepath.Join(os.Getenv("HOME"), ".config/jabal/workspaces", badWorkspace))
+		os.RemoveAll(filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", badWorkspace))
 	})
 }
 

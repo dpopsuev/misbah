@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-// Workspace represents a jabal workspace.
+// Workspace represents a misbah workspace.
 type Workspace struct {
 	// Name is the workspace name.
 	Name string
@@ -83,17 +83,17 @@ func (w *Workspace) Validate() error {
 
 // GetMountPath returns the mount path for the workspace.
 func (w *Workspace) GetMountPath() string {
-	return filepath.Join("/tmp/jabal", w.Name)
+	return filepath.Join("/tmp/misbah", w.Name)
 }
 
 // GetLockPath returns the lock file path for the workspace.
 func (w *Workspace) GetLockPath() string {
-	return filepath.Join("/tmp/jabal/.locks", w.Name+".lock")
+	return filepath.Join("/tmp/misbah/.locks", w.Name+".lock")
 }
 
 // GetProviderConfigDir returns the provider config directory for the workspace.
 func (w *Workspace) GetProviderConfigDir(provider string) string {
-	// Provider configs are stored in ~/.config/jabal/workspaces/{workspace}/.{provider}/
+	// Provider configs are stored in ~/.config/misbah/workspaces/{workspace}/.{provider}/
 	baseDir := filepath.Dir(w.ManifestPath)
 	return filepath.Join(baseDir, "."+provider)
 }

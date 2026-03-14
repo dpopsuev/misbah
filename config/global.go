@@ -8,7 +8,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// GlobalConfig represents the global jabal configuration.
+// GlobalConfig represents the global misbah configuration.
 type GlobalConfig struct {
 	// ConfigDir is the configuration directory.
 	ConfigDir string `yaml:"config_dir,omitempty"`
@@ -26,7 +26,7 @@ type GlobalConfig struct {
 	AutoCleanup bool `yaml:"auto_cleanup,omitempty"`
 }
 
-// LoadGlobalConfig loads the global configuration from ~/.config/jabal/config.yaml.
+// LoadGlobalConfig loads the global configuration from ~/.config/misbah/config.yaml.
 func LoadGlobalConfig() (*GlobalConfig, error) {
 	configPath := GetGlobalConfigPath()
 
@@ -51,7 +51,7 @@ func LoadGlobalConfig() (*GlobalConfig, error) {
 	return &config, nil
 }
 
-// SaveGlobalConfig saves the global configuration to ~/.config/jabal/config.yaml.
+// SaveGlobalConfig saves the global configuration to ~/.config/misbah/config.yaml.
 func (c *GlobalConfig) SaveGlobalConfig() error {
 	configPath := GetGlobalConfigPath()
 

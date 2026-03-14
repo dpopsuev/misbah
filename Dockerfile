@@ -1,4 +1,4 @@
-# Dockerfile for testing jabal in a clean Linux environment
+# Dockerfile for testing misbah in a clean Linux environment
 FROM golang:1.22-alpine
 
 # Install dependencies

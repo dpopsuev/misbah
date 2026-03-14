@@ -68,17 +68,17 @@ func TestEnsureDir(t *testing.T) {
 
 func TestEnsureWorkspaceDir(t *testing.T) {
 	// Save original env and restore after test
-	originalConfigDir := os.Getenv("JABAL_CONFIG_DIR")
+	originalConfigDir := os.Getenv("MISBAH_CONFIG_DIR")
 	defer func() {
 		if originalConfigDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", originalConfigDir)
+			os.Setenv("MISBAH_CONFIG_DIR", originalConfigDir)
 		} else {
-			os.Unsetenv("JABAL_CONFIG_DIR")
+			os.Unsetenv("MISBAH_CONFIG_DIR")
 		}
 	}()
 
 	tmpDir := t.TempDir()
-	os.Setenv("JABAL_CONFIG_DIR", tmpDir)
+	os.Setenv("MISBAH_CONFIG_DIR", tmpDir)
 
 	err := EnsureWorkspaceDir("test-workspace")
 	assert.NoError(t, err)
@@ -117,17 +117,17 @@ func TestIsDirectory(t *testing.T) {
 
 func TestListWorkspaces(t *testing.T) {
 	// Save original env and restore after test
-	originalConfigDir := os.Getenv("JABAL_CONFIG_DIR")
+	originalConfigDir := os.Getenv("MISBAH_CONFIG_DIR")
 	defer func() {
 		if originalConfigDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", originalConfigDir)
+			os.Setenv("MISBAH_CONFIG_DIR", originalConfigDir)
 		} else {
-			os.Unsetenv("JABAL_CONFIG_DIR")
+			os.Unsetenv("MISBAH_CONFIG_DIR")
 		}
 	}()
 
 	tmpDir := t.TempDir()
-	os.Setenv("JABAL_CONFIG_DIR", tmpDir)
+	os.Setenv("MISBAH_CONFIG_DIR", tmpDir)
 
 	t.Run("empty workspaces directory", func(t *testing.T) {
 		workspaces, err := ListWorkspaces()
@@ -160,17 +160,17 @@ func TestListWorkspaces(t *testing.T) {
 
 func TestWorkspaceExists(t *testing.T) {
 	// Save original env and restore after test
-	originalConfigDir := os.Getenv("JABAL_CONFIG_DIR")
+	originalConfigDir := os.Getenv("MISBAH_CONFIG_DIR")
 	defer func() {
 		if originalConfigDir != "" {
-			os.Setenv("JABAL_CONFIG_DIR", originalConfigDir)
+			os.Setenv("MISBAH_CONFIG_DIR", originalConfigDir)
 		} else {
-			os.Unsetenv("JABAL_CONFIG_DIR")
+			os.Unsetenv("MISBAH_CONFIG_DIR")
 		}
 	}()
 
 	tmpDir := t.TempDir()
-	os.Setenv("JABAL_CONFIG_DIR", tmpDir)
+	os.Setenv("MISBAH_CONFIG_DIR", tmpDir)
 
 	// Create a workspace with manifest
 	require.NoError(t, EnsureWorkspaceDir("existing"))

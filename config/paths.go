@@ -45,7 +45,7 @@ func EnsureDir(path string) error {
 	return nil
 }
 
-// EnsureConfigDir ensures the jabal config directory exists.
+// EnsureConfigDir ensures the misbah config directory exists.
 func EnsureConfigDir() error {
 	return EnsureDir(GetConfigDir())
 }

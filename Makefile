@@ -1,7 +1,7 @@
 .PHONY: build test test-unit test-integration test-e2e test-e2e-claude install clean lint fmt vet coverage help
 
 # Build variables
-BINARY_NAME=jabal
+BINARY_NAME=misbah
 BUILD_DIR=bin
 GO=go
 GOFLAGS=-v
@@ -10,16 +10,16 @@ LDFLAGS=-ldflags "-s -w"
 # Default target
 all: build
 
-## build: Build the jabal binary
+## build: Build the misbah binary
 build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
-	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/jabal
+	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/misbah
 
-## install: Install jabal to $GOPATH/bin
+## install: Install misbah to $GOPATH/bin
 install:
 	@echo "Installing $(BINARY_NAME)..."
-	$(GO) install $(LDFLAGS) ./cmd/jabal
+	$(GO) install $(LDFLAGS) ./cmd/misbah
 
 ## test: Run all tests
 test: test-unit test-integration
@@ -44,7 +44,7 @@ test-e2e:
 	@if [ "$$(uname)" != "Linux" ]; then \
 		echo "Skipping E2E tests (requires Linux)"; \
 	else \
-		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e ./test/e2e/...; \
 	fi
 
@@ -54,7 +54,7 @@ test-e2e-llm:
 	@if [ "$$(uname)" != "Linux" ]; then \
 		echo "Skipping E2E tests (requires Linux)"; \
 	else \
-		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e,llm ./test/e2e/...; \
 	fi
 
@@ -65,7 +65,7 @@ test-e2e-container:
 		echo "podman not found, install from https://podman.io"; \
 		exit 1; \
 	fi
-	@$(GO) build -o ./jabal ./cmd/jabal
+	@$(GO) build -o ./misbah ./cmd/misbah
 	@$(GO) test -v -tags=e2e -run TestContainerized ./test/e2e/...
 
 ## test-e2e-mcp: Run MCP-based E2E tests
@@ -74,7 +74,7 @@ test-e2e-mcp:
 	@if [ "$$(uname)" != "Linux" ]; then \
 		echo "Skipping E2E tests (requires Linux)"; \
 	else \
-		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e -run TestMCPWorkflow ./test/e2e/...; \
 	fi
 
@@ -84,11 +84,11 @@ test-e2e-llm-mcp:
 	@if [ "$$(uname)" != "Linux" ]; then \
 		echo "Skipping E2E tests (requires Linux)"; \
 	else \
-		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e,llm -run TestLLMWithMCP ./test/e2e/...; \
 	fi
 
-## test-e2e-claude: Run E2E tests with Claude Code (requires claude binary + JABAL_E2E_CLAUDE=true)
+## test-e2e-claude: Run E2E tests with Claude Code (requires claude binary + MISBAH_E2E_CLAUDE=true)
 test-e2e-claude:
 	@echo "Running Claude Code E2E tests..."
 	@if [ "$$(uname)" != "Linux" ]; then \
@@ -98,11 +98,11 @@ test-e2e-claude:
 			echo "claude binary not found in PATH"; \
 			exit 1; \
 		fi; \
-		if [ "$$JABAL_E2E_CLAUDE" != "true" ]; then \
-			echo "Set JABAL_E2E_CLAUDE=true to run Claude tests"; \
+		if [ "$$MISBAH_E2E_CLAUDE" != "true" ]; then \
+			echo "Set MISBAH_E2E_CLAUDE=true to run Claude tests"; \
 			exit 1; \
 		fi; \
-		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e,claude ./test/e2e/...; \
 	fi
 
