@@ -9,11 +9,12 @@ import (
 	"github.com/dpopsuev/misbah/validate"
 )
 
-// Lifecycle manages the complete workspace mount/unmount lifecycle.
+// Lifecycle manages the complete jail/workspace mount/unmount lifecycle.
 type Lifecycle struct {
 	lockManager      *LockManager
 	namespaceManager *NamespaceManager
 	bindMounter      *BindMounter
+	cgroupManager    *CgroupManager
 	logger           *metrics.Logger
 	recorder         *metrics.MetricsRecorder
 }
@@ -34,6 +35,67 @@ func NewLifecycle(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Li
 		logger:           logger,
 		recorder:         recorder,
 	}
+}
+
+// MountJail mounts a jail using JailSpec and executes the process.
+func (lc *Lifecycle) MountJail(spec *model.JailSpec) error {
+	timer := metrics.NewTimer("jail.mount.total", map[string]string{
+		"jail": spec.Metadata.Name,
+	}, lc.recorder, lc.logger)
+	defer timer.Stop()
+
+	lc.logger.Infof("Mounting jail %s", spec.Metadata.Name)
+
+	// 1. Validate jail spec
+	lc.logger.Debugf("Validating jail spec for %s", spec.Metadata.Name)
+	if err := spec.Validate(); err != nil {
+		return fmt.Errorf("jail spec validation failed: %w", err)
+	}
+
+	// 2. Check namespace support
+	if err := lc.namespaceManager.CheckNamespaceSupport(); err != nil {
+		return fmt.Errorf("namespace support check failed: %w", err)
+	}
+
+	// 3. Acquire lock
+	lc.logger.Debugf("Acquiring lock for jail %s", spec.Metadata.Name)
+	provider := "jail" // For jails, we don't have a specific provider
+	if label, ok := spec.Metadata.Labels["provider"]; ok {
+		provider = label
+	}
+
+	_, err := lc.lockManager.AcquireLock(spec.Metadata.Name, provider)
+	if err != nil {
+		return fmt.Errorf("failed to acquire lock: %w", err)
+	}
+	defer func() {
+		// Release lock on any error
+		if err != nil {
+			lc.logger.Debugf("Releasing lock due to error")
+			_ = lc.lockManager.ReleaseLock(spec.Metadata.Name)
+		}
+	}()
+
+	// 4. Setup cgroup manager
+	cgroupMgr := NewCgroupManager(spec.Metadata.Name)
+
+	// 5. Create jail (namespace + mounts + cgroups + process)
+	lc.logger.Infof("Creating jail and launching process: %v", spec.Process.Command)
+
+	if err := lc.namespaceManager.CreateJail(spec, cgroupMgr); err != nil {
+		return fmt.Errorf("jail creation failed: %w", err)
+	}
+
+	// 6. Cleanup after process exits
+	lc.logger.Infof("Process exited, cleaning up")
+
+	// Release lock
+	if err := lc.lockManager.ReleaseLock(spec.Metadata.Name); err != nil {
+		lc.logger.Warnf("Failed to release lock: %v", err)
+	}
+
+	lc.logger.Infof("Jail %s unmounted successfully", spec.Metadata.Name)
+	return nil
 }
 
 // Mount mounts a workspace and launches the provider.
