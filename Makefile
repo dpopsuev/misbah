@@ -1,0 +1,147 @@
+.PHONY: build test test-unit test-integration test-e2e test-e2e-claude install clean lint fmt vet coverage help
+
+# Build variables
+BINARY_NAME=jabal
+BUILD_DIR=bin
+GO=go
+GOFLAGS=-v
+LDFLAGS=-ldflags "-s -w"
+
+# Default target
+all: build
+
+## build: Build the jabal binary
+build:
+	@echo "Building $(BINARY_NAME)..."
+	@mkdir -p $(BUILD_DIR)
+	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/jabal
+
+## install: Install jabal to $GOPATH/bin
+install:
+	@echo "Installing $(BINARY_NAME)..."
+	$(GO) install $(LDFLAGS) ./cmd/jabal
+
+## test: Run all tests
+test: test-unit test-integration
+
+## test-unit: Run unit tests
+test-unit:
+	@echo "Running unit tests..."
+	$(GO) test -v -race -cover ./model/... ./config/... ./validate/... ./provider/... ./mount/... ./cli/... ./mcp/... ./metrics/...
+
+## test-integration: Run integration tests (Linux only)
+test-integration:
+	@echo "Running integration tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping integration tests (requires Linux)"; \
+	else \
+		$(GO) test -v -tags=integration ./test/integration/...; \
+	fi
+
+## test-e2e: Run end-to-end tests (basic workflow)
+test-e2e:
+	@echo "Running E2E tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping E2E tests (requires Linux)"; \
+	else \
+		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) test -v -tags=e2e ./test/e2e/...; \
+	fi
+
+## test-e2e-llm: Run E2E tests with LLM agent (requires Ollama + Qwen2.5-Coder)
+test-e2e-llm:
+	@echo "Running LLM-driven E2E tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping E2E tests (requires Linux)"; \
+	else \
+		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) test -v -tags=e2e,llm ./test/e2e/...; \
+	fi
+
+## test-e2e-container: Run E2E tests in container (requires podman)
+test-e2e-container:
+	@echo "Running containerized E2E tests..."
+	@if ! command -v podman >/dev/null 2>&1; then \
+		echo "podman not found, install from https://podman.io"; \
+		exit 1; \
+	fi
+	@$(GO) build -o ./jabal ./cmd/jabal
+	@$(GO) test -v -tags=e2e -run TestContainerized ./test/e2e/...
+
+## test-e2e-mcp: Run MCP-based E2E tests
+test-e2e-mcp:
+	@echo "Running MCP E2E tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping E2E tests (requires Linux)"; \
+	else \
+		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) test -v -tags=e2e -run TestMCPWorkflow ./test/e2e/...; \
+	fi
+
+## test-e2e-llm-mcp: Run LLM + MCP E2E tests (requires Ollama + Qwen2.5-Coder)
+test-e2e-llm-mcp:
+	@echo "Running LLM + MCP E2E tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping E2E tests (requires Linux)"; \
+	else \
+		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) test -v -tags=e2e,llm -run TestLLMWithMCP ./test/e2e/...; \
+	fi
+
+## test-e2e-claude: Run E2E tests with Claude Code (requires claude binary + JABAL_E2E_CLAUDE=true)
+test-e2e-claude:
+	@echo "Running Claude Code E2E tests..."
+	@if [ "$$(uname)" != "Linux" ]; then \
+		echo "Skipping E2E tests (requires Linux)"; \
+	else \
+		if ! command -v claude >/dev/null 2>&1; then \
+			echo "claude binary not found in PATH"; \
+			exit 1; \
+		fi; \
+		if [ "$$JABAL_E2E_CLAUDE" != "true" ]; then \
+			echo "Set JABAL_E2E_CLAUDE=true to run Claude tests"; \
+			exit 1; \
+		fi; \
+		$(GO) build -o ./jabal ./cmd/jabal; \
+		$(GO) test -v -tags=e2e,claude ./test/e2e/...; \
+	fi
+
+## coverage: Generate test coverage report
+coverage:
+	@echo "Generating coverage report..."
+	$(GO) test -race -coverprofile=coverage.txt -covermode=atomic ./...
+	$(GO) tool cover -html=coverage.txt -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+
+## lint: Run golangci-lint
+lint:
+	@echo "Running linter..."
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		golangci-lint run ./...; \
+	else \
+		echo "golangci-lint not installed. Install from https://golangci-lint.run/usage/install/"; \
+	fi
+
+## fmt: Format code
+fmt:
+	@echo "Formatting code..."
+	$(GO) fmt ./...
+
+## vet: Run go vet
+vet:
+	@echo "Running go vet..."
+	$(GO) vet ./...
+
+## clean: Clean build artifacts
+clean:
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BUILD_DIR)
+	@rm -f coverage.txt coverage.html
+	@$(GO) clean
+
+## help: Show this help message
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Targets:"
+	@sed -n 's/^##//p' Makefile | column -t -s ':' | sed -e 's/^/ /'
