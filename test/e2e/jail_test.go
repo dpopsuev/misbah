@@ -13,8 +13,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestJailHappyPath tests the complete end-user workflow for jail commands.
-func TestJailHappyPath(t *testing.T) {
+// TestJailLifecycle tests the complete lifecycle of jail operations:
+// create spec, validate, inspect, start, list, stop, destroy.
+func TestJailLifecycle(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("Jail tests require Linux")
 	}
