@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestLoadJailSpec(t *testing.T) {
+func TestLoadContainerSpec(t *testing.T) {
 	tests := []struct {
 		name    string
 		yaml    string
@@ -17,13 +17,13 @@ func TestLoadJailSpec(t *testing.T) {
 		errMsg  string
 	}{
 		{
-			name: "valid minimal jail spec",
+			name: "valid minimal container spec",
 			yaml: `version: "1.0"
 metadata:
-  name: test-jail
+  name: test-container
 process:
   command: ["/bin/bash"]
-  cwd: /jail/workspace
+  cwd: /container/workspace
 namespaces:
   user: true
   mount: true
@@ -31,22 +31,22 @@ namespaces:
 mounts:
   - type: bind
     source: /tmp
-    destination: /jail/workspace
+    destination: /container/workspace
 `,
 			wantErr: false,
 		},
 		{
-			name: "valid jail spec with resources",
+			name: "valid container spec with resources",
 			yaml: `version: "1.0"
 metadata:
-  name: test-jail
-  description: Test jail
+  name: test-container
+  description: Test container
   labels:
     env: test
 process:
   command: ["/usr/bin/claude"]
-  env: ["MISBAH_JAIL=test"]
-  cwd: /jail/workspace
+  env: ["MISBAH_CONTAINER=test"]
+  cwd: /container/workspace
 namespaces:
   user: true
   mount: true
@@ -55,7 +55,7 @@ namespaces:
 mounts:
   - type: bind
     source: /home/user/repo
-    destination: /jail/workspace/repo
+    destination: /container/workspace/repo
     options: [ro]
 resources:
   memory: 2GB
@@ -73,12 +73,12 @@ resources:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Write to temp file
-			tmpFile := filepath.Join(t.TempDir(), "jail.yaml")
+			tmpFile := filepath.Join(t.TempDir(), "container.yaml")
 			err := os.WriteFile(tmpFile, []byte(tt.yaml), 0644)
 			require.NoError(t, err)
 
 			// Load spec
-			spec, err := LoadJailSpec(tmpFile)
+			spec, err := LoadContainerSpec(tmpFile)
 
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -90,23 +90,23 @@ resources:
 	}
 }
 
-func TestJailSpecValidate(t *testing.T) {
+func TestContainerSpecValidate(t *testing.T) {
 	tests := []struct {
 		name    string
-		spec    *JailSpec
+		spec    *ContainerSpec
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name: "valid minimal spec",
-			spec: &JailSpec{
+			spec: &ContainerSpec{
 				Version: "1.0",
-				Metadata: JailMetadata{
-					Name: "test-jail",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
 				},
 				Process: ProcessSpec{
 					Command: []string{"/bin/bash"},
-					Cwd:     "/jail/workspace",
+					Cwd:     "/container/workspace",
 				},
 				Namespaces: NamespaceSpec{
 					User:  true,
@@ -116,7 +116,7 @@ func TestJailSpecValidate(t *testing.T) {
 					{
 						Type:        "bind",
 						Source:      "/tmp",
-						Destination: "/jail/workspace",
+						Destination: "/container/workspace",
 					},
 				},
 			},
@@ -124,14 +124,14 @@ func TestJailSpecValidate(t *testing.T) {
 		},
 		{
 			name: "invalid version",
-			spec: &JailSpec{
+			spec: &ContainerSpec{
 				Version: "2.0",
-				Metadata: JailMetadata{
-					Name: "test-jail",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
 				},
 				Process: ProcessSpec{
 					Command: []string{"/bin/bash"},
-					Cwd:     "/jail/workspace",
+					Cwd:     "/container/workspace",
 				},
 				Namespaces: NamespaceSpec{
 					User:  true,
@@ -140,18 +140,18 @@ func TestJailSpecValidate(t *testing.T) {
 				Mounts: []MountSpec{},
 			},
 			wantErr: true,
-			errMsg:  "unsupported jail spec version",
+			errMsg:  "unsupported container spec version",
 		},
 		{
-			name: "missing jail name",
-			spec: &JailSpec{
+			name: "missing container name",
+			spec: &ContainerSpec{
 				Version: "1.0",
-				Metadata: JailMetadata{
+				Metadata: ContainerMetadata{
 					Name: "",
 				},
 				Process: ProcessSpec{
 					Command: []string{"/bin/bash"},
-					Cwd:     "/jail/workspace",
+					Cwd:     "/container/workspace",
 				},
 				Namespaces: NamespaceSpec{
 					User:  true,
@@ -159,18 +159,18 @@ func TestJailSpecValidate(t *testing.T) {
 				},
 			},
 			wantErr: true,
-			errMsg:  "jail name is required",
+			errMsg:  "container name is required",
 		},
 		{
 			name: "missing user namespace",
-			spec: &JailSpec{
+			spec: &ContainerSpec{
 				Version: "1.0",
-				Metadata: JailMetadata{
-					Name: "test-jail",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
 				},
 				Process: ProcessSpec{
 					Command: []string{"/bin/bash"},
-					Cwd:     "/jail/workspace",
+					Cwd:     "/container/workspace",
 				},
 				Namespaces: NamespaceSpec{
 					User:  false,
@@ -182,14 +182,14 @@ func TestJailSpecValidate(t *testing.T) {
 		},
 		{
 			name: "invalid mount type",
-			spec: &JailSpec{
+			spec: &ContainerSpec{
 				Version: "1.0",
-				Metadata: JailMetadata{
-					Name: "test-jail",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
 				},
 				Process: ProcessSpec{
 					Command: []string{"/bin/bash"},
-					Cwd:     "/jail/workspace",
+					Cwd:     "/container/workspace",
 				},
 				Namespaces: NamespaceSpec{
 					User:  true,
@@ -198,7 +198,7 @@ func TestJailSpecValidate(t *testing.T) {
 				Mounts: []MountSpec{
 					{
 						Type:        "invalid",
-						Destination: "/jail/workspace",
+						Destination: "/container/workspace",
 					},
 				},
 			},
@@ -234,7 +234,7 @@ func TestProcessSpecValidate(t *testing.T) {
 			name: "valid process spec",
 			spec: ProcessSpec{
 				Command: []string{"/bin/bash"},
-				Cwd:     "/jail/workspace",
+				Cwd:     "/container/workspace",
 			},
 			wantErr: false,
 		},
@@ -242,7 +242,7 @@ func TestProcessSpecValidate(t *testing.T) {
 			name: "missing command",
 			spec: ProcessSpec{
 				Command: []string{},
-				Cwd:     "/jail/workspace",
+				Cwd:     "/container/workspace",
 			},
 			wantErr: true,
 			errMsg:  "process command is required",
@@ -295,7 +295,7 @@ func TestMountSpecValidate(t *testing.T) {
 			spec: MountSpec{
 				Type:        "bind",
 				Source:      "/home/user/repo",
-				Destination: "/jail/workspace/repo",
+				Destination: "/container/workspace/repo",
 				Options:     []string{"ro"},
 			},
 			wantErr: false,
@@ -304,7 +304,7 @@ func TestMountSpecValidate(t *testing.T) {
 			name: "valid tmpfs mount",
 			spec: MountSpec{
 				Type:        "tmpfs",
-				Destination: "/jail/workspace/tmp",
+				Destination: "/container/workspace/tmp",
 			},
 			wantErr: false,
 		},
@@ -312,7 +312,7 @@ func TestMountSpecValidate(t *testing.T) {
 			name: "invalid mount type",
 			spec: MountSpec{
 				Type:        "overlay",
-				Destination: "/jail/workspace",
+				Destination: "/container/workspace",
 			},
 			wantErr: true,
 			errMsg:  "invalid mount type",
@@ -341,7 +341,7 @@ func TestMountSpecValidate(t *testing.T) {
 			name: "bind mount missing source",
 			spec: MountSpec{
 				Type:        "bind",
-				Destination: "/jail/workspace",
+				Destination: "/container/workspace",
 			},
 			wantErr: true,
 			errMsg:  "bind mount requires source",
@@ -351,7 +351,7 @@ func TestMountSpecValidate(t *testing.T) {
 			spec: MountSpec{
 				Type:        "bind",
 				Source:      "/tmp",
-				Destination: "/jail/workspace",
+				Destination: "/container/workspace",
 				Options:     []string{"ro", "rw"},
 			},
 			wantErr: true,
@@ -362,7 +362,7 @@ func TestMountSpecValidate(t *testing.T) {
 			spec: MountSpec{
 				Type:        "bind",
 				Source:      "/tmp",
-				Destination: "/jail/workspace",
+				Destination: "/container/workspace",
 				Options:     []string{"invalid-option"},
 			},
 			wantErr: true,
@@ -458,16 +458,16 @@ func TestResourceSpecValidate(t *testing.T) {
 	}
 }
 
-func TestSaveJailSpec(t *testing.T) {
-	spec := &JailSpec{
+func TestSaveContainerSpec(t *testing.T) {
+	spec := &ContainerSpec{
 		Version: "1.0",
-		Metadata: JailMetadata{
-			Name:        "test-jail",
-			Description: "Test jail for unit tests",
+		Metadata: ContainerMetadata{
+			Name:        "test-container",
+			Description: "Test container for unit tests",
 		},
 		Process: ProcessSpec{
 			Command: []string{"/bin/bash"},
-			Cwd:     "/jail/workspace",
+			Cwd:     "/container/workspace",
 		},
 		Namespaces: NamespaceSpec{
 			User:  true,
@@ -478,21 +478,21 @@ func TestSaveJailSpec(t *testing.T) {
 			{
 				Type:        "bind",
 				Source:      "/tmp",
-				Destination: "/jail/workspace",
+				Destination: "/container/workspace",
 				Options:     []string{"rw"},
 			},
 		},
 	}
 
-	tmpFile := filepath.Join(t.TempDir(), "jail.yaml")
-	err := spec.SaveJailSpec(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "container.yaml")
+	err := spec.SaveContainerSpec(tmpFile)
 	require.NoError(t, err)
 
 	// Verify file exists
 	assert.FileExists(t, tmpFile)
 
 	// Load it back
-	loaded, err := LoadJailSpec(tmpFile)
+	loaded, err := LoadContainerSpec(tmpFile)
 	require.NoError(t, err)
 
 	assert.Equal(t, spec.Version, loaded.Version)
@@ -501,19 +501,19 @@ func TestSaveJailSpec(t *testing.T) {
 	assert.Equal(t, len(spec.Mounts), len(loaded.Mounts))
 }
 
-func TestJailSpecString(t *testing.T) {
-	spec := &JailSpec{
+func TestContainerSpecString(t *testing.T) {
+	spec := &ContainerSpec{
 		Version: "1.0",
-		Metadata: JailMetadata{
-			Name: "test-jail",
+		Metadata: ContainerMetadata{
+			Name: "test-container",
 		},
 		Mounts: []MountSpec{
-			{Type: "bind", Source: "/tmp", Destination: "/jail/workspace"},
+			{Type: "bind", Source: "/tmp", Destination: "/container/workspace"},
 		},
 	}
 
 	str := spec.String()
-	assert.Contains(t, str, "test-jail")
+	assert.Contains(t, str, "test-container")
 	assert.Contains(t, str, "1.0")
 	assert.Contains(t, str, "mounts=1")
 }

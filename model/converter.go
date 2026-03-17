@@ -5,24 +5,24 @@ import (
 	"path/filepath"
 )
 
-// WorkspaceToJailSpec converts a Workspace (old model) to a JailSpec (new model).
+// WorkspaceToContainerSpec converts a Workspace (old model) to a ContainerSpec (new model).
 // This provides backward compatibility during the transition period.
-func WorkspaceToJailSpec(w *Workspace, command []string) (*JailSpec, error) {
+func WorkspaceToContainerSpec(w *Workspace, command []string) (*ContainerSpec, error) {
 	if len(command) == 0 {
 		return nil, fmt.Errorf("command is required")
 	}
 
-	// Convert workspace to jail spec
-	spec := &JailSpec{
+	// Convert workspace to container spec
+	spec := &ContainerSpec{
 		Version: "1.0",
-		Metadata: JailMetadata{
+		Metadata: ContainerMetadata{
 			Name:        w.Name,
 			Description: w.Description,
 			Labels:      make(map[string]string),
 		},
 		Process: ProcessSpec{
 			Command: command,
-			Env:     []string{fmt.Sprintf("MISBAH_JAIL=%s", w.Name)},
+			Env:     []string{fmt.Sprintf("MISBAH_CONTAINER=%s", w.Name)},
 			Cwd:     filepath.Join("/tmp/misbah", w.Name),
 		},
 		Namespaces: NamespaceSpec{
@@ -52,9 +52,9 @@ func WorkspaceToJailSpec(w *Workspace, command []string) (*JailSpec, error) {
 	return spec, nil
 }
 
-// ManifestToJailSpec converts a Manifest (old model) to a JailSpec (new model).
-// This is a higher-level conversion that takes a manifest file and generates a jail spec.
-func ManifestToJailSpec(manifest *Manifest, command []string) (*JailSpec, error) {
+// ManifestToContainerSpec converts a Manifest (old model) to a ContainerSpec (new model).
+// This is a higher-level conversion that takes a manifest file and generates a container spec.
+func ManifestToContainerSpec(manifest *Manifest, command []string) (*ContainerSpec, error) {
 	// Convert manifest to workspace first
 	sources, err := manifest.ToSources()
 	if err != nil {
@@ -69,13 +69,13 @@ func ManifestToJailSpec(manifest *Manifest, command []string) (*JailSpec, error)
 		Tags:        manifest.Tags,
 	}
 
-	// Convert workspace to jail spec
-	return WorkspaceToJailSpec(workspace, command)
+	// Convert workspace to container spec
+	return WorkspaceToContainerSpec(workspace, command)
 }
 
-// JailSpecToWorkspace converts a JailSpec back to a Workspace (for backward compatibility).
+// ContainerSpecToWorkspace converts a ContainerSpec back to a Workspace (for backward compatibility).
 // Note: This conversion is lossy - process, namespaces, and resources information is discarded.
-func JailSpecToWorkspace(spec *JailSpec) (*Workspace, error) {
+func ContainerSpecToWorkspace(spec *ContainerSpec) (*Workspace, error) {
 	workspace := &Workspace{
 		Name:        spec.Metadata.Name,
 		Description: spec.Metadata.Description,

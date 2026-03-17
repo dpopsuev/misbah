@@ -9,7 +9,7 @@ import (
 	"github.com/dpopsuev/misbah/validate"
 )
 
-// Lifecycle manages the complete jail/workspace mount/unmount lifecycle.
+// // Lifecycle manages the complete container/workspace mount/unmount lifecycle.
 type Lifecycle struct {
 	lockManager      *LockManager
 	namespaceManager *NamespaceManager
@@ -37,19 +37,19 @@ func NewLifecycle(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Li
 	}
 }
 
-// MountJail mounts a jail using JailSpec and executes the process.
-func (lc *Lifecycle) MountJail(spec *model.JailSpec) error {
-	timer := metrics.NewTimer("jail.mount.total", map[string]string{
-		"jail": spec.Metadata.Name,
+// CreateContainer mounts a container using ContainerSpec and executes the process.
+func (lc *Lifecycle) CreateContainer(spec *model.ContainerSpec) error {
+	timer := metrics.NewTimer("container.mount.total", map[string]string{
+		"container": spec.Metadata.Name,
 	}, lc.recorder, lc.logger)
 	defer timer.Stop()
 
-	lc.logger.Infof("Mounting jail %s", spec.Metadata.Name)
+	lc.logger.Infof("Mounting container %s", spec.Metadata.Name)
 
-	// 1. Validate jail spec
-	lc.logger.Debugf("Validating jail spec for %s", spec.Metadata.Name)
+	// 1. Validate container spec
+	lc.logger.Debugf("Validating container spec for %s", spec.Metadata.Name)
 	if err := spec.Validate(); err != nil {
-		return fmt.Errorf("jail spec validation failed: %w", err)
+		return fmt.Errorf("container spec validation failed: %w", err)
 	}
 
 	// 2. Check namespace support
@@ -58,8 +58,8 @@ func (lc *Lifecycle) MountJail(spec *model.JailSpec) error {
 	}
 
 	// 3. Acquire lock
-	lc.logger.Debugf("Acquiring lock for jail %s", spec.Metadata.Name)
-	provider := "jail" // For jails, we don't have a specific provider
+	lc.logger.Debugf("Acquiring lock for container %s", spec.Metadata.Name)
+	provider := "container" // // For containers, we don't have a specific provider
 	if label, ok := spec.Metadata.Labels["provider"]; ok {
 		provider = label
 	}
@@ -79,11 +79,11 @@ func (lc *Lifecycle) MountJail(spec *model.JailSpec) error {
 	// 4. Setup cgroup manager
 	cgroupMgr := NewCgroupManager(spec.Metadata.Name)
 
-	// 5. Create jail (namespace + mounts + cgroups + process)
-	lc.logger.Infof("Creating jail and launching process: %v", spec.Process.Command)
+	// 5. Create container (namespace + mounts + cgroups + process)
+	lc.logger.Infof("Creating container and launching process: %v", spec.Process.Command)
 
-	if err := lc.namespaceManager.CreateJail(spec, cgroupMgr); err != nil {
-		return fmt.Errorf("jail creation failed: %w", err)
+	if err := lc.namespaceManager.CreateContainer(spec, cgroupMgr); err != nil {
+		return fmt.Errorf("container creation failed: %w", err)
 	}
 
 	// 6. Cleanup after process exits
@@ -94,7 +94,7 @@ func (lc *Lifecycle) MountJail(spec *model.JailSpec) error {
 		lc.logger.Warnf("Failed to release lock: %v", err)
 	}
 
-	lc.logger.Infof("Jail %s unmounted successfully", spec.Metadata.Name)
+	lc.logger.Infof("Container %s unmounted successfully", spec.Metadata.Name)
 	return nil
 }
 

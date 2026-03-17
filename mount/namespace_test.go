@@ -95,33 +95,33 @@ func TestNamespaceManagerBuildMountScript(t *testing.T) {
 		{
 			Type:        "bind",
 			Source:      "/tmp/source1",
-			Destination: "/jail/workspace/source1",
+			Destination: "/container/workspace/source1",
 			Options:     []string{"rw"},
 		},
 		{
 			Type:        "bind",
 			Source:      "/tmp/source2",
-			Destination: "/jail/workspace/source2",
+			Destination: "/container/workspace/source2",
 			Options:     []string{"ro"},
 		},
 		{
 			Type:        "tmpfs",
-			Destination: "/jail/workspace/tmp",
+			Destination: "/container/workspace/tmp",
 		},
 	}
 
 	script := nm.buildMountScript(mounts)
 
 	// Check bind mounts
-	assert.Contains(t, script, "mkdir -p \"/jail/workspace/source1\"")
+	assert.Contains(t, script, "mkdir -p \"/container/workspace/source1\"")
 	assert.Contains(t, script, "mount --bind")
 	assert.Contains(t, script, "/tmp/source1")
 
-	assert.Contains(t, script, "mkdir -p \"/jail/workspace/source2\"")
+	assert.Contains(t, script, "mkdir -p \"/container/workspace/source2\"")
 	assert.Contains(t, script, "/tmp/source2")
 
 	// Check tmpfs mount
-	assert.Contains(t, script, "mkdir -p \"/jail/workspace/tmp\"")
+	assert.Contains(t, script, "mkdir -p \"/container/workspace/tmp\"")
 	assert.Contains(t, script, "mount -t tmpfs")
 }
 
@@ -132,16 +132,16 @@ func TestNamespaceManagerBuildBindMount(t *testing.T) {
 	mount := model.MountSpec{
 		Type:        "bind",
 		Source:      "/home/user/repo",
-		Destination: "/jail/workspace/repo",
+		Destination: "/container/workspace/repo",
 		Options:     []string{"ro", "nosuid"},
 	}
 
 	script := nm.buildBindMount(mount)
 
-	assert.Contains(t, script, "mkdir -p \"/jail/workspace/repo\"")
+	assert.Contains(t, script, "mkdir -p \"/container/workspace/repo\"")
 	assert.Contains(t, script, "mount --bind")
 	assert.Contains(t, script, "/home/user/repo")
-	assert.Contains(t, script, "/jail/workspace/repo")
+	assert.Contains(t, script, "/container/workspace/repo")
 	assert.Contains(t, script, "ro")
 	assert.Contains(t, script, "nosuid")
 }
@@ -152,13 +152,13 @@ func TestNamespaceManagerBuildTmpfsMount(t *testing.T) {
 
 	mount := model.MountSpec{
 		Type:        "tmpfs",
-		Destination: "/jail/workspace/tmp",
+		Destination: "/container/workspace/tmp",
 		Options:     []string{"size=1G"},
 	}
 
 	script := nm.buildTmpfsMount(mount)
 
-	assert.Contains(t, script, "mkdir -p \"/jail/workspace/tmp\"")
+	assert.Contains(t, script, "mkdir -p \"/container/workspace/tmp\"")
 	assert.Contains(t, script, "mount -t tmpfs")
 	assert.Contains(t, script, "size=1G")
 }
@@ -169,12 +169,12 @@ func TestNamespaceManagerBuildProcMount(t *testing.T) {
 
 	mount := model.MountSpec{
 		Type:        "proc",
-		Destination: "/jail/proc",
+		Destination: "/container/proc",
 	}
 
 	script := nm.buildProcMount(mount)
 
-	assert.Contains(t, script, "mkdir -p \"/jail/proc\"")
+	assert.Contains(t, script, "mkdir -p \"/container/proc\"")
 	assert.Contains(t, script, "mount -t proc")
 }
 
@@ -182,10 +182,10 @@ func TestNamespaceManagerBuildShellCommand(t *testing.T) {
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
 	nm := NewNamespaceManager(logger)
 
-	spec := &model.JailSpec{
+	spec := &model.ContainerSpec{
 		Process: model.ProcessSpec{
 			Command: []string{"/usr/bin/claude", "--help"},
-			Cwd:     "/jail/workspace",
+			Cwd:     "/container/workspace",
 		},
 	}
 
@@ -195,27 +195,27 @@ func TestNamespaceManagerBuildShellCommand(t *testing.T) {
 
 	assert.Contains(t, cmd, "set -e")
 	assert.Contains(t, cmd, "# mount script here")
-	assert.Contains(t, cmd, "cd \"/jail/workspace\"")
+	assert.Contains(t, cmd, "cd \"/container/workspace\"")
 	assert.Contains(t, cmd, "exec /usr/bin/claude --help")
 }
 
-func TestNamespaceManagerCreateJail_InvalidSpec(t *testing.T) {
+func TestNamespaceManagerCreateContainer_InvalidSpec(t *testing.T) {
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
 	nm := NewNamespaceManager(logger)
 
 	// Invalid spec (missing version)
-	spec := &model.JailSpec{
-		Metadata: model.JailMetadata{
-			Name: "test-jail",
+	spec := &model.ContainerSpec{
+		Metadata: model.ContainerMetadata{
+			Name: "test-container",
 		},
 	}
 
-	err := nm.CreateJail(spec, nil)
+	err := nm.CreateContainer(spec, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "invalid jail spec")
+	assert.Contains(t, err.Error(), "invalid container spec")
 }
 
-func TestNamespaceManagerCreateJail_NonLinux(t *testing.T) {
+func TestNamespaceManagerCreateContainer_NonLinux(t *testing.T) {
 	if runtime.GOOS == "linux" {
 		t.Skip("Test requires non-Linux OS")
 	}
@@ -223,10 +223,10 @@ func TestNamespaceManagerCreateJail_NonLinux(t *testing.T) {
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
 	nm := NewNamespaceManager(logger)
 
-	spec := &model.JailSpec{
+	spec := &model.ContainerSpec{
 		Version: "1.0",
-		Metadata: model.JailMetadata{
-			Name: "test-jail",
+		Metadata: model.ContainerMetadata{
+			Name: "test-container",
 		},
 		Process: model.ProcessSpec{
 			Command: []string{"/bin/true"},
@@ -238,7 +238,7 @@ func TestNamespaceManagerCreateJail_NonLinux(t *testing.T) {
 		},
 	}
 
-	err := nm.CreateJail(spec, nil)
+	err := nm.CreateContainer(spec, nil)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "only supported on Linux")
 }

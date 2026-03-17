@@ -30,11 +30,11 @@ const (
 	// CgroupSubdir is the subdirectory for Misbah cgroups.
 	CgroupSubdir = "misbah"
 
-	// JailSpecVersion is the current jail specification version.
-	JailSpecVersion = "1.0"
+	// ContainerSpecVersion is the current container specification version.
+	ContainerSpecVersion = "1.0"
 
-	// DefaultJailWorkspace is the default working directory inside jails.
-	DefaultJailWorkspace = "/jail/workspace"
+	// // DefaultContainerWorkspace is the default working directory inside containers.
+	DefaultContainerWorkspace = "/container/workspace"
 )
 
 // Environment variable names.
@@ -45,8 +45,8 @@ const (
 	// EnvTempDir overrides the temp directory.
 	EnvTempDir = "MISBAH_TEMP_DIR"
 
-	// EnvJail is set inside the jail to identify it.
-	EnvJail = "MISBAH_JAIL"
+	// EnvContainer is set inside the container to identify it.
+	EnvContainer = "MISBAH_CONTAINER"
 
 	// EnvWorkspace is set for legacy workspace compatibility.
 	EnvWorkspace = "MISBAH_WORKSPACE"

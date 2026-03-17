@@ -10,21 +10,21 @@ import (
 	"github.com/dpopsuev/misbah/model"
 )
 
-// CgroupManager manages cgroup v2 resource limits for jails.
+// // CgroupManager manages cgroup v2 resource limits for containers.
 type CgroupManager struct {
 	cgroupRoot string
-	jailName   string
+	containerName   string
 }
 
-// NewCgroupManager creates a new cgroup manager for a jail.
-func NewCgroupManager(jailName string) *CgroupManager {
+// NewCgroupManager creates a new cgroup manager for a container.
+func NewCgroupManager(containerName string) *CgroupManager {
 	return &CgroupManager{
 		cgroupRoot: "/sys/fs/cgroup",
-		jailName:   jailName,
+		containerName:   containerName,
 	}
 }
 
-// Setup creates and configures cgroup for the jail with specified resource limits.
+// Setup creates and configures cgroup for the container with specified resource limits.
 func (c *CgroupManager) Setup(resources *model.ResourceSpec) error {
 	// Skip if no resources specified
 	if resources == nil {
@@ -36,7 +36,7 @@ func (c *CgroupManager) Setup(resources *model.ResourceSpec) error {
 		return fmt.Errorf("cgroup v2 not available (required for resource limits)")
 	}
 
-	// Create cgroup directory for this jail
+	// // Create cgroup directory for this container
 	cgroupPath := c.getCgroupPath()
 	if err := os.MkdirAll(cgroupPath, 0755); err != nil {
 		return fmt.Errorf("failed to create cgroup directory: %w", err)
@@ -79,7 +79,7 @@ func (c *CgroupManager) AddProcess(pid int) error {
 	return nil
 }
 
-// Cleanup removes the cgroup for this jail.
+// // Cleanup removes the cgroup for this container.
 func (c *CgroupManager) Cleanup() error {
 	cgroupPath := c.getCgroupPath()
 
@@ -93,9 +93,9 @@ func (c *CgroupManager) Cleanup() error {
 	return nil
 }
 
-// getCgroupPath returns the full path to the jail's cgroup directory.
+// getCgroupPath returns the full path to the container's cgroup directory.
 func (c *CgroupManager) getCgroupPath() string {
-	return filepath.Join(c.cgroupRoot, "misbah", c.jailName)
+	return filepath.Join(c.cgroupRoot, "misbah", c.containerName)
 }
 
 // isCgroupV2Available checks if cgroup v2 is available and mounted.

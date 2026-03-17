@@ -8,16 +8,16 @@ import (
 )
 
 func TestNewCgroupManager(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 	assert.NotNil(t, mgr)
-	assert.Equal(t, "test-jail", mgr.jailName)
+	assert.Equal(t, "test-container", mgr.containerName)
 	assert.Equal(t, "/sys/fs/cgroup", mgr.cgroupRoot)
 }
 
 func TestCgroupManager_getCgroupPath(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 	path := mgr.getCgroupPath()
-	assert.Equal(t, "/sys/fs/cgroup/misbah/test-jail", path)
+	assert.Equal(t, "/sys/fs/cgroup/misbah/test-container", path)
 }
 
 func TestParseMemorySpec(t *testing.T) {
@@ -86,7 +86,7 @@ func TestParseMemorySpec(t *testing.T) {
 }
 
 func TestCgroupManager_isCgroupV2Available(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 
 	// This test depends on the system configuration
 	// Just verify it doesn't panic and returns a boolean
@@ -95,7 +95,7 @@ func TestCgroupManager_isCgroupV2Available(t *testing.T) {
 }
 
 func TestCgroupManager_Setup_NilResources(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 
 	// Should succeed with nil resources (no-op)
 	err := mgr.Setup(nil)
@@ -103,7 +103,7 @@ func TestCgroupManager_Setup_NilResources(t *testing.T) {
 }
 
 func TestCgroupManager_Setup_ValidResources(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 
 	resources := &model.ResourceSpec{
 		Memory:    "512MB",
@@ -124,7 +124,7 @@ func TestCgroupManager_Setup_ValidResources(t *testing.T) {
 }
 
 func TestCgroupManager_Cleanup(t *testing.T) {
-	mgr := NewCgroupManager("test-jail")
+	mgr := NewCgroupManager("test-container")
 
 	// Cleanup should not fail even if cgroup doesn't exist
 	err := mgr.Cleanup()

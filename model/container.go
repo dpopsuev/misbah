@@ -8,24 +8,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// JailSpec represents a jail specification conforming to MSB-SPC-2026-001.
-type JailSpec struct {
+// ContainerSpec represents a container specification conforming to MSB-SPC-2026-001.
+type ContainerSpec struct {
 	Version    string            `yaml:"version"`
-	Metadata   JailMetadata      `yaml:"metadata"`
+	Metadata   ContainerMetadata      `yaml:"metadata"`
 	Process    ProcessSpec       `yaml:"process"`
 	Namespaces NamespaceSpec     `yaml:"namespaces"`
 	Mounts     []MountSpec       `yaml:"mounts"`
 	Resources  *ResourceSpec     `yaml:"resources,omitempty"`
 }
 
-// JailMetadata contains jail metadata.
-type JailMetadata struct {
+// ContainerMetadata contains container metadata.
+type ContainerMetadata struct {
 	Name        string            `yaml:"name"`
 	Description string            `yaml:"description,omitempty"`
 	Labels      map[string]string `yaml:"labels,omitempty"`
 }
 
-// ProcessSpec specifies the process to execute in the jail.
+// ProcessSpec specifies the process to execute in the container.
 type ProcessSpec struct {
 	Command []string `yaml:"command"`
 	Env     []string `yaml:"env,omitempty"`
@@ -57,26 +57,26 @@ type ResourceSpec struct {
 	IOWeight  int    `yaml:"io_weight,omitempty"`  // 1-10000
 }
 
-// LoadJailSpec loads a jail specification from a YAML file.
-func LoadJailSpec(path string) (*JailSpec, error) {
+// LoadContainerSpec loads a container specification from a YAML file.
+func LoadContainerSpec(path string) (*ContainerSpec, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read jail spec: %w", err)
+		return nil, fmt.Errorf("failed to read container spec: %w", err)
 	}
 
-	var spec JailSpec
+	var spec ContainerSpec
 	if err := yaml.Unmarshal(data, &spec); err != nil {
-		return nil, fmt.Errorf("failed to parse jail spec: %w", err)
+		return nil, fmt.Errorf("failed to parse container spec: %w", err)
 	}
 
 	return &spec, nil
 }
 
-// SaveJailSpec saves a jail specification to a YAML file.
-func (j *JailSpec) SaveJailSpec(path string) error {
+// SaveContainerSpec saves a container specification to a YAML file.
+func (j *ContainerSpec) SaveContainerSpec(path string) error {
 	data, err := yaml.Marshal(j)
 	if err != nil {
-		return fmt.Errorf("failed to marshal jail spec: %w", err)
+		return fmt.Errorf("failed to marshal container spec: %w", err)
 	}
 
 	// Ensure directory exists
@@ -86,17 +86,17 @@ func (j *JailSpec) SaveJailSpec(path string) error {
 	}
 
 	if err := os.WriteFile(path, data, 0644); err != nil {
-		return fmt.Errorf("failed to write jail spec: %w", err)
+		return fmt.Errorf("failed to write container spec: %w", err)
 	}
 
 	return nil
 }
 
-// Validate validates the jail specification.
-func (j *JailSpec) Validate() error {
+// Validate validates the container specification.
+func (j *ContainerSpec) Validate() error {
 	// Validate version
 	if j.Version != "1.0" {
-		return fmt.Errorf("unsupported jail spec version: %s (expected 1.0)", j.Version)
+		return fmt.Errorf("unsupported container spec version: %s (expected 1.0)", j.Version)
 	}
 
 	// Validate metadata
@@ -131,15 +131,15 @@ func (j *JailSpec) Validate() error {
 	return nil
 }
 
-// Validate validates jail metadata.
-func (m *JailMetadata) Validate() error {
+// Validate validates container metadata.
+func (m *ContainerMetadata) Validate() error {
 	if m.Name == "" {
-		return fmt.Errorf("jail name is required")
+		return fmt.Errorf("container name is required")
 	}
 
 	// Use existing workspace name validation
 	if err := ValidateWorkspaceName(m.Name); err != nil {
-		return fmt.Errorf("invalid jail name: %w", err)
+		return fmt.Errorf("invalid container name: %w", err)
 	}
 
 	return nil
@@ -285,8 +285,8 @@ func isValidMemorySpec(spec string) bool {
 	return true
 }
 
-// String returns a human-readable representation of the jail spec.
-func (j *JailSpec) String() string {
-	return fmt.Sprintf("JailSpec{name=%s, version=%s, mounts=%d}",
+// String returns a human-readable representation of the container spec.
+func (j *ContainerSpec) String() string {
+	return fmt.Sprintf("ContainerSpec{name=%s, version=%s, mounts=%d}",
 		j.Metadata.Name, j.Version, len(j.Mounts))
 }

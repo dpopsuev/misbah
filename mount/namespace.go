@@ -11,7 +11,7 @@ import (
 	"github.com/dpopsuev/misbah/model"
 )
 
-// NamespaceManager manages Linux namespaces for jails.
+// // NamespaceManager manages Linux namespaces for containers.
 type NamespaceManager struct {
 	logger *metrics.Logger
 }
@@ -27,20 +27,20 @@ func NewNamespaceManager(logger *metrics.Logger) *NamespaceManager {
 	}
 }
 
-// CreateJail creates a new jail with namespaces, mounts, and resource limits.
-func (nm *NamespaceManager) CreateJail(spec *model.JailSpec, cgroupMgr *CgroupManager) error {
+// CreateContainer creates a new container with namespaces, mounts, and resource limits.
+func (nm *NamespaceManager) CreateContainer(spec *model.ContainerSpec, cgroupMgr *CgroupManager) error {
 	// Verify we're on Linux
 	if runtime.GOOS != "linux" {
-		return fmt.Errorf("%w: jails are only supported on Linux (current OS: %s)",
+		return fmt.Errorf("%w: containers are only supported on Linux (current OS: %s)",
 			model.ErrNamespaceCreationFailed, runtime.GOOS)
 	}
 
-	// Validate jail spec
+	// Validate container spec
 	if err := spec.Validate(); err != nil {
-		return fmt.Errorf("invalid jail spec: %w", err)
+		return fmt.Errorf("invalid container spec: %w", err)
 	}
 
-	nm.logger.Debugf("Creating jail: %s", spec.Metadata.Name)
+	nm.logger.Debugf("Creating container: %s", spec.Metadata.Name)
 
 	// Check if unshare is available
 	if _, err := exec.LookPath("unshare"); err != nil {
@@ -51,7 +51,7 @@ func (nm *NamespaceManager) CreateJail(spec *model.JailSpec, cgroupMgr *CgroupMa
 	// Build the mount script
 	mountScript := nm.buildMountScript(spec.Mounts)
 
-	// Build the command to execute in the jail
+	// Build the command to execute in the container
 	shellCmd := nm.buildShellCommand(spec, mountScript)
 
 	// Build unshare arguments based on namespace spec
@@ -71,7 +71,7 @@ func (nm *NamespaceManager) CreateJail(spec *model.JailSpec, cgroupMgr *CgroupMa
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	nm.logger.Infof("Executing jail process: %v", spec.Process.Command)
+	nm.logger.Infof("Executing container process: %v", spec.Process.Command)
 
 	// Setup cgroup before starting process (if resources specified)
 	if spec.Resources != nil && cgroupMgr != nil {
@@ -93,7 +93,7 @@ func (nm *NamespaceManager) CreateJail(spec *model.JailSpec, cgroupMgr *CgroupMa
 		}
 	}
 
-	nm.logger.Infof("Jail exited successfully")
+	nm.logger.Infof("Container exited successfully")
 	return nil
 }
 
@@ -216,8 +216,8 @@ func (nm *NamespaceManager) buildProcMount(mount model.MountSpec) string {
 	return script.String()
 }
 
-// buildShellCommand builds the complete shell command to execute in the jail.
-func (nm *NamespaceManager) buildShellCommand(spec *model.JailSpec, mountScript string) string {
+// buildShellCommand builds the complete shell command to execute in the container.
+func (nm *NamespaceManager) buildShellCommand(spec *model.ContainerSpec, mountScript string) string {
 	// Join command arguments
 	cmdStr := strings.Join(spec.Process.Command, " ")
 
@@ -261,16 +261,16 @@ func (nm *NamespaceManager) CheckNamespaceSupport() error {
 	return nil
 }
 
-// CreateNamespace is deprecated. Use CreateJail instead.
+// CreateNamespace is deprecated. Use CreateContainer instead.
 // Kept for backward compatibility during transition.
 func (nm *NamespaceManager) CreateNamespace(mountPath string, sources []model.Source, providerBinary string, env []string) error {
-	nm.logger.Warnf("CreateNamespace is deprecated, use CreateJail instead")
+	nm.logger.Warnf("CreateNamespace is deprecated, use CreateContainer instead")
 
-	// Convert to JailSpec
-	spec := &model.JailSpec{
+	// Convert to ContainerSpec
+	spec := &model.ContainerSpec{
 		Version: "1.0",
-		Metadata: model.JailMetadata{
-			Name: "legacy-jail",
+		Metadata: model.ContainerMetadata{
+			Name: "legacy-container",
 		},
 		Process: model.ProcessSpec{
 			Command: strings.Fields(providerBinary),
@@ -295,5 +295,5 @@ func (nm *NamespaceManager) CreateNamespace(mountPath string, sources []model.So
 		})
 	}
 
-	return nm.CreateJail(spec, nil)
+	return nm.CreateContainer(spec, nil)
 }

@@ -3,18 +3,18 @@
 ## Multi-Repository Workspace
 
 This workspace spans two repositories:
-- **Misbah** (`/home/dpopsuev/Workspace/misbah`) - Layer 1: Jail creation and namespace isolation
+- **Misbah** (`/home/dpopsuev/Workspace/misbah`) - Layer 1: Container creation and namespace isolation
 - **Djinn** (`/home/dpopsuev/Workspace/djinn`) - Layer 2+3: Agent runtime and CLI
 
 Use absolute paths to work across both repos until Misbah PoC is complete.
 
 ## What is Misbah?
 
-Misbah is a jail manager for CLI AI agents that creates isolated execution environments (jails) using Linux user namespaces, mount namespaces, and cgroups. It's a legitimate development tool, not malware.
+Misbah is a container manager for CLI AI agents that creates isolated execution environments (jails) using Linux user namespaces, mount namespaces, and cgroups. It's a legitimate development tool, not malware.
 
 ## What is Djinn?
 
-Djinn is an AI pair programming CLI (inspired by Aider) that runs LLM agents in isolated Misbah jails. It provides conversational coding sessions with multi-repository support and safe execution environments.
+Djinn is an AI pair programming CLI (inspired by Aider) that runs LLM agents in isolated Misbah containers. It provides conversational coding sessions with multi-repository support and safe execution environments.
 
 ## Safety & Security
 
@@ -31,7 +31,7 @@ You can safely:
 - Read and modify source code in both repos
 - Build and test Misbah and Djinn
 - Run misbah commands for development/testing
-- Create test jails
+- Create test containers
 - Debug namespace and mount operations
 - Work across both repositories using absolute paths
 
@@ -44,27 +44,27 @@ All misbah commands are safe to run (once implemented):
 cd /home/dpopsuev/Workspace/misbah
 go build ./cmd/misbah
 
-# Create jail spec
-./misbah jail create --spec jail.yaml
+# Create container spec
+./misbah container create --spec container.yaml
 
-# Validate jail spec
-./misbah jail validate --spec jail.yaml
+# Validate container spec
+./misbah container validate --spec container.yaml
 
-# Start jail
-./misbah jail start --spec jail.yaml --name agent-main
+# Start container
+./misbah container start --spec container.yaml --name agent-main
 
-# Stop jail
-./misbah jail stop --name agent-main
+# Stop container
+./misbah container stop --name agent-main
 
-# List jails
-./misbah jail list
+# List containers
+./misbah container list
 ```
 
 ### Current Status: Pre-PoC
 
 - Misbah is being developed from scratch
 - Djinn directory is currently empty (to be built on Misbah)
-- Working toward Layer 1 (Misbah jail creation) PoC
+- Working toward Layer 1 (Misbah container creation) PoC
 - Once PoC is complete, Misbah will provide the multi-repo workspace capability it's designed to create
 
 ### Development Guidelines
@@ -88,8 +88,8 @@ go build ./cmd/misbah
 
 ### 3-Layer Agent Runtime Stack
 
-1. **Layer 1 - Misbah (Jail/Namespace)**: Creates isolated jails using Linux namespaces and cgroups
-2. **Layer 2 - Djinn Runtime (Orchestration)**: Manages jail lifecycle, Agent Runtime Interface (ARI), agent drivers
+1. **Layer 1 - Misbah (Container/Namespace)**: Creates isolated containers using Linux namespaces and cgroups
+2. **Layer 2 - Djinn Runtime (Orchestration)**: Manages container lifecycle, Agent Runtime Interface (ARI), agent drivers
 3. **Layer 3 - Djinn CLI (User Interface)**: Conversational AI pair programming interface
 
 ### Misbah Technical Details
@@ -100,18 +100,18 @@ Misbah uses standard Linux features:
 - Process isolation (PID namespaces)
 - Cgroups for resource limits (memory, CPU, I/O)
 - User namespaces for unprivileged operation
-- Support for nested jails
+- Support for nested containers
 
 All operations are unprivileged and reversible.
 
 ## Security Model
 
 1. **User-level isolation**: Runs as regular user, no privilege escalation required
-2. **Explicit consent**: User must specify which directories to mount in jail spec
-3. **Process boundaries**: Each jail runs in isolated namespaces
-4. **Clean cleanup**: Namespaces destroyed when jail process exits
+2. **Explicit consent**: User must specify which directories to mount in container spec
+3. **Process boundaries**: Each container runs in isolated namespaces
+4. **Clean cleanup**: Namespaces destroyed when container process exits
 5. **Resource limits**: Cgroup constraints prevent resource exhaustion
-6. **Nested isolation**: Support for creating jails within jails (closures)
+6. **Nested isolation**: Support for creating containers within containers (closures)
 
 ## Common Tasks
 
@@ -141,6 +141,6 @@ If uncertain about any operation:
 1. Check the code in both repositories
 2. Consult Scribe artifacts for specs and goals
 3. Ask the user for clarification
-4. Check the Jail Specification (MSB-SPC-2026-001) for contract details
+4. Check the Container Specification (MSB-SPC-2026-001) for contract details
 
 Misbah and Djinn are development tools designed to help developers and AI agents work more effectively across multiple repositories in isolated, safe environments. All operations are transparent and user-controlled.

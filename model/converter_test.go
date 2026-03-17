@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkspaceToJailSpec(t *testing.T) {
+func TestWorkspaceToContainerSpec(t *testing.T) {
 	workspace := &Workspace{
 		Name:        "test-workspace",
 		Description: "Test workspace",
@@ -27,7 +27,7 @@ func TestWorkspaceToJailSpec(t *testing.T) {
 
 	command := []string{"/usr/bin/claude"}
 
-	spec, err := WorkspaceToJailSpec(workspace, command)
+	spec, err := WorkspaceToContainerSpec(workspace, command)
 	require.NoError(t, err)
 	require.NotNil(t, spec)
 
@@ -58,24 +58,24 @@ func TestWorkspaceToJailSpec(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestWorkspaceToJailSpec_MissingCommand(t *testing.T) {
+func TestWorkspaceToContainerSpec_MissingCommand(t *testing.T) {
 	workspace := &Workspace{
 		Name:    "test-workspace",
 		Sources: []Source{},
 	}
 
-	spec, err := WorkspaceToJailSpec(workspace, []string{})
+	spec, err := WorkspaceToContainerSpec(workspace, []string{})
 	assert.Error(t, err)
 	assert.Nil(t, spec)
 	assert.Contains(t, err.Error(), "command is required")
 }
 
-func TestJailSpecToWorkspace(t *testing.T) {
-	spec := &JailSpec{
+func TestContainerSpecToWorkspace(t *testing.T) {
+	spec := &ContainerSpec{
 		Version: "1.0",
-		Metadata: JailMetadata{
-			Name:        "test-jail",
-			Description: "Test jail",
+		Metadata: ContainerMetadata{
+			Name:        "test-container",
+			Description: "Test container",
 			Labels: map[string]string{
 				"tag0": "production",
 				"tag1": "kubernetes",
@@ -83,7 +83,7 @@ func TestJailSpecToWorkspace(t *testing.T) {
 		},
 		Process: ProcessSpec{
 			Command: []string{"/usr/bin/claude"},
-			Cwd:     "/tmp/misbah/test-jail",
+			Cwd:     "/tmp/misbah/test-container",
 		},
 		Namespaces: NamespaceSpec{
 			User:  true,
@@ -94,25 +94,25 @@ func TestJailSpecToWorkspace(t *testing.T) {
 			{
 				Type:        "bind",
 				Source:      "/home/user/repo-a",
-				Destination: "/tmp/misbah/test-jail/repo-a",
+				Destination: "/tmp/misbah/test-container/repo-a",
 				Options:     []string{"rw"},
 			},
 			{
 				Type:        "bind",
 				Source:      "/home/user/repo-b",
-				Destination: "/tmp/misbah/test-jail/repo-b",
+				Destination: "/tmp/misbah/test-container/repo-b",
 				Options:     []string{"ro"},
 			},
 		},
 	}
 
-	workspace, err := JailSpecToWorkspace(spec)
+	workspace, err := ContainerSpecToWorkspace(spec)
 	require.NoError(t, err)
 	require.NotNil(t, workspace)
 
 	// Validate conversion
-	assert.Equal(t, "test-jail", workspace.Name)
-	assert.Equal(t, "Test jail", workspace.Description)
+	assert.Equal(t, "test-container", workspace.Name)
+	assert.Equal(t, "Test container", workspace.Description)
 	assert.Len(t, workspace.Sources, 2)
 
 	// Check sources
@@ -124,7 +124,7 @@ func TestJailSpecToWorkspace(t *testing.T) {
 	assert.Contains(t, workspace.Tags, "kubernetes")
 }
 
-func TestManifestToJailSpec(t *testing.T) {
+func TestManifestToContainerSpec(t *testing.T) {
 	manifest := &Manifest{
 		Name:        "test-manifest",
 		Description: "Test manifest",
@@ -144,7 +144,7 @@ func TestManifestToJailSpec(t *testing.T) {
 
 	command := []string{"/usr/bin/claude"}
 
-	spec, err := ManifestToJailSpec(manifest, command)
+	spec, err := ManifestToContainerSpec(manifest, command)
 	require.NoError(t, err)
 	require.NotNil(t, spec)
 
@@ -157,7 +157,7 @@ func TestManifestToJailSpec(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestRoundTrip_WorkspaceToJailSpecToWorkspace(t *testing.T) {
+func TestRoundTrip_WorkspaceToContainerSpecToWorkspace(t *testing.T) {
 	// Start with a workspace
 	originalWorkspace := &Workspace{
 		Name:        "roundtrip-test",
@@ -169,12 +169,12 @@ func TestRoundTrip_WorkspaceToJailSpecToWorkspace(t *testing.T) {
 		Tags: []string{"tag1", "tag2"},
 	}
 
-	// Convert to jail spec
-	spec, err := WorkspaceToJailSpec(originalWorkspace, []string{"/bin/bash"})
+	// Convert to container spec
+	spec, err := WorkspaceToContainerSpec(originalWorkspace, []string{"/bin/bash"})
 	require.NoError(t, err)
 
 	// Convert back to workspace
-	convertedWorkspace, err := JailSpecToWorkspace(spec)
+	convertedWorkspace, err := ContainerSpecToWorkspace(spec)
 	require.NoError(t, err)
 
 	// Compare (note: some fields may not round-trip perfectly due to lossy conversion)
