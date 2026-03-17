@@ -19,6 +19,8 @@ type ContainerSpec struct {
 	Image      string            `yaml:"image,omitempty"`   // OCI image ref (required for kata)
 	Runtime    string            `yaml:"runtime,omitempty"` // "" or "namespace" = Phase 1, "kata" = CRI
 	Network    *NetworkConfig    `yaml:"network,omitempty"` // Network configuration (kata only)
+	TierConfig *TierConfig       `yaml:"tier,omitempty"`     // Tier-scoped mount configuration
+	Nesting    *NestingConfig    `yaml:"nesting,omitempty"`  // Nesting configuration for recursive containers
 }
 
 // NetworkConfig specifies network configuration for CRI containers.
@@ -27,6 +29,55 @@ type NetworkConfig struct {
 	DNSServers []string `yaml:"dns_servers,omitempty"`
 	DNSSearch  []string `yaml:"dns_search,omitempty"`
 	Hostname   string   `yaml:"hostname,omitempty"`
+}
+
+// NestingConfig specifies nesting configuration for recursive container creation inside VMs.
+type NestingConfig struct {
+	Enabled          bool   `yaml:"enabled"`
+	MaxDepth         int    `yaml:"max_depth,omitempty"`         // 1-10, default 3
+	PermissionPolicy string `yaml:"permission_policy,omitempty"` // "inherit", "restrict", "deny"
+}
+
+// Validate validates nesting configuration.
+func (n *NestingConfig) Validate() error {
+	if !n.Enabled {
+		return nil
+	}
+
+	if n.MaxDepth < 1 || n.MaxDepth > 10 {
+		return fmt.Errorf("nesting max_depth must be between 1 and 10: %d", n.MaxDepth)
+	}
+
+	switch n.PermissionPolicy {
+	case "", "inherit", "restrict", "deny":
+		// Valid policies
+	default:
+		return fmt.Errorf("invalid nesting permission_policy: %q (must be inherit, restrict, or deny)", n.PermissionPolicy)
+	}
+
+	return nil
+}
+
+// TierConfig specifies tier-scoped mount configuration for agent isolation.
+type TierConfig struct {
+	Tier          string   `yaml:"tier"`                       // eco, sys, com, mod
+	WritablePaths []string `yaml:"writable_paths,omitempty"`   // relative paths within workspace to make RW
+}
+
+// Validate validates tier configuration.
+func (t *TierConfig) Validate() error {
+	switch t.Tier {
+	case "eco", "sys", "com", "mod":
+		// Valid tiers
+	default:
+		return fmt.Errorf("invalid tier: %q (must be eco, sys, com, or mod)", t.Tier)
+	}
+
+	if t.Tier == "eco" && len(t.WritablePaths) > 0 {
+		return fmt.Errorf("eco tier must not have writable paths (read-only)")
+	}
+
+	return nil
 }
 
 // ContainerMetadata contains container metadata.
@@ -155,6 +206,20 @@ func (j *ContainerSpec) Validate() error {
 	if j.Network != nil {
 		if err := j.Network.Validate(); err != nil {
 			return fmt.Errorf("invalid network: %w", err)
+		}
+	}
+
+	// Validate tier config (if specified)
+	if j.TierConfig != nil {
+		if err := j.TierConfig.Validate(); err != nil {
+			return fmt.Errorf("invalid tier: %w", err)
+		}
+	}
+
+	// Validate nesting config (if specified)
+	if j.Nesting != nil {
+		if err := j.Nesting.Validate(); err != nil {
+			return fmt.Errorf("invalid nesting: %w", err)
 		}
 	}
 

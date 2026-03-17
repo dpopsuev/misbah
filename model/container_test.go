@@ -333,6 +333,161 @@ func TestContainerSpecValidate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "invalid network mode",
 		},
+		{
+			name: "valid tier config",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				TierConfig: &TierConfig{
+					Tier:          "mod",
+					WritablePaths: []string{"pkg/auth"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid tier value",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				TierConfig: &TierConfig{
+					Tier: "invalid",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid tier",
+		},
+		{
+			name: "eco tier with writable paths",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				TierConfig: &TierConfig{
+					Tier:          "eco",
+					WritablePaths: []string{"src/"},
+				},
+			},
+			wantErr: true,
+			errMsg:  "eco tier must not have writable paths",
+		},
+		{
+			name: "valid nesting config",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Nesting: &NestingConfig{
+					Enabled:          true,
+					MaxDepth:         3,
+					PermissionPolicy: "inherit",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid nesting max_depth",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Nesting: &NestingConfig{
+					Enabled:  true,
+					MaxDepth: 11,
+				},
+			},
+			wantErr: true,
+			errMsg:  "nesting max_depth must be between 1 and 10",
+		},
+		{
+			name: "invalid nesting policy",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Nesting: &NestingConfig{
+					Enabled:          true,
+					MaxDepth:         3,
+					PermissionPolicy: "allow-all",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid nesting permission_policy",
+		},
+		{
+			name: "nil tier config (backward compat)",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+			},
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

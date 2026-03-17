@@ -6,6 +6,7 @@ import (
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/tier"
 	"github.com/dpopsuev/misbah/validate"
 )
 
@@ -80,7 +81,31 @@ func (lc *Lifecycle) Start(spec *model.ContainerSpec) error {
 		}
 	}()
 
-	// 3. Delegate to backend
+	// 3. Resolve tier mounts (if configured)
+	if spec.TierConfig != nil {
+		lc.logger.Infof("Resolving tier mounts: tier=%s", spec.TierConfig.Tier)
+		tierSpec := &tier.TierSpec{
+			Tier:          tier.Tier(spec.TierConfig.Tier),
+			WritablePaths: spec.TierConfig.WritablePaths,
+		}
+		// Extract repo paths from existing bind mounts
+		for _, m := range spec.Mounts {
+			if m.Type == "bind" && m.Source != "" {
+				tierSpec.Repos = append(tierSpec.Repos, m.Source)
+			}
+		}
+		if len(tierSpec.Repos) > 0 {
+			tierMounts, tierErr := tier.GenerateTierMounts(tierSpec)
+			if tierErr != nil {
+				err = fmt.Errorf("tier mount generation failed: %w", tierErr)
+				return err
+			}
+			spec.Mounts = tierMounts
+			lc.logger.Infof("Tier mounts generated: %d mounts", len(tierMounts))
+		}
+	}
+
+	// 4. Delegate to backend
 	lc.logger.Infof("Creating container via backend: %v", spec.Process.Command)
 
 	if _, err = lc.backend.Start(spec); err != nil {
