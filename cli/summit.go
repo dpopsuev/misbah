@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func runSummit(cmd *cobra.Command, args []string) error {
 	logger.Debugf("Getting status for workspace: %s", summitWorkspace)
 
 	// Create lifecycle manager
-	lifecycle := mount.NewLifecycle(logger, recorder)
+	lifecycle := runtime.NewLifecycle(logger, recorder)
 
 	// Get status
 	status, err := lifecycle.GetStatus(summitWorkspace)

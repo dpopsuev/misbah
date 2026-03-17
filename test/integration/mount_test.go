@@ -3,25 +3,25 @@
 package integration_test
 
 import (
+	goruntime "runtime"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/mount"
+	msbruntime "github.com/dpopsuev/misbah/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestNamespaceCreation(t *testing.T) {
-	if runtime.GOOS != "linux" {
+	if goruntime.GOOS != "linux" {
 		t.Skip("Namespace tests require Linux")
 	}
 
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
-	nm := mount.NewNamespaceManager(logger)
+	nm := msbruntime.NewNamespaceManager(logger)
 
 	// Test that namespace support check works
 	err := nm.CheckNamespaceSupport()
@@ -33,7 +33,7 @@ func TestNamespaceCreation(t *testing.T) {
 func TestLockManagerIntegration(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
-	lm := mount.NewLockManager(logger)
+	lm := msbruntime.NewLockManager(logger)
 	lm.SetLocksDir(tmpDir) // Use custom locks dir for testing
 
 	workspace := "integration-test"
@@ -74,7 +74,7 @@ func TestLockManagerIntegration(t *testing.T) {
 func TestBindMounterIntegration(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
-	bm := mount.NewBindMounter(logger)
+	bm := msbruntime.NewBindMounter(logger)
 
 	// Create test sources
 	sourceA := filepath.Join(tmpDir, "source-a")

@@ -6,7 +6,7 @@ import (
 
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/dpopsuev/misbah/provider"
 	"github.com/spf13/cobra"
 )
@@ -95,7 +95,7 @@ func runMount(cmd *cobra.Command, args []string) error {
 	}
 
 	// Create lifecycle manager
-	lifecycle := mount.NewLifecycle(logger, recorder)
+	lifecycle := runtime.NewLifecycle(logger, recorder)
 
 	// Mount workspace and launch provider
 	logger.Infof("Launching %s in workspace %s", providerBinary, workspace.Name)

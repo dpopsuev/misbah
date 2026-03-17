@@ -74,6 +74,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Log level (debug, info, warn, error)")
 	rootCmd.PersistentFlags().StringVar(&configDir, "config-dir", "", "Configuration directory (default: ~/.config/misbah)")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Verbose output (same as --log-level=debug)")
+	rootCmd.PersistentFlags().String("cri-endpoint", "", "CRI endpoint (default: unix:///run/containerd/containerd.sock)")
 
 	// Add commands
 	rootCmd.AddCommand(mountCmd)

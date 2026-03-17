@@ -1,4 +1,4 @@
-package mount
+package runtime
 
 import (
 	"fmt"
@@ -9,18 +9,19 @@ import (
 	"github.com/dpopsuev/misbah/validate"
 )
 
-// // Lifecycle manages the complete container/workspace mount/unmount lifecycle.
+// Lifecycle manages the complete container/workspace lifecycle.
 type Lifecycle struct {
 	lockManager      *LockManager
 	namespaceManager *NamespaceManager
 	bindMounter      *BindMounter
-	cgroupManager    *CgroupManager
+	backend          ContainerBackend
 	logger           *metrics.Logger
 	recorder         *metrics.MetricsRecorder
 }
 
 // NewLifecycle creates a new lifecycle manager.
-func NewLifecycle(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Lifecycle {
+// If backend is nil, the default NamespaceBackend is used.
+func NewLifecycle(logger *metrics.Logger, recorder *metrics.MetricsRecorder, backend ...ContainerBackend) *Lifecycle {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
@@ -28,23 +29,32 @@ func NewLifecycle(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Li
 		recorder = metrics.GetDefaultRecorder()
 	}
 
+	var b ContainerBackend
+	if len(backend) > 0 && backend[0] != nil {
+		b = backend[0]
+	} else {
+		b = NewNamespaceBackend(logger)
+	}
+
 	return &Lifecycle{
 		lockManager:      NewLockManager(logger),
 		namespaceManager: NewNamespaceManager(logger),
 		bindMounter:      NewBindMounter(logger),
+		backend:          b,
 		logger:           logger,
 		recorder:         recorder,
 	}
 }
 
-// CreateContainer mounts a container using ContainerSpec and executes the process.
-func (lc *Lifecycle) CreateContainer(spec *model.ContainerSpec) error {
-	timer := metrics.NewTimer("container.mount.total", map[string]string{
+// Start starts a container using ContainerSpec via the configured backend.
+func (lc *Lifecycle) Start(spec *model.ContainerSpec) error {
+	timer := metrics.NewTimer("container.start.total", map[string]string{
 		"container": spec.Metadata.Name,
+		"runtime":   spec.Runtime,
 	}, lc.recorder, lc.logger)
 	defer timer.Stop()
 
-	lc.logger.Infof("Mounting container %s", spec.Metadata.Name)
+	lc.logger.Infof("Starting container %s (runtime=%s)", spec.Metadata.Name, spec.Runtime)
 
 	// 1. Validate container spec
 	lc.logger.Debugf("Validating container spec for %s", spec.Metadata.Name)
@@ -52,14 +62,9 @@ func (lc *Lifecycle) CreateContainer(spec *model.ContainerSpec) error {
 		return fmt.Errorf("container spec validation failed: %w", err)
 	}
 
-	// 2. Check namespace support
-	if err := lc.namespaceManager.CheckNamespaceSupport(); err != nil {
-		return fmt.Errorf("namespace support check failed: %w", err)
-	}
-
-	// 3. Acquire lock
+	// 2. Acquire lock
 	lc.logger.Debugf("Acquiring lock for container %s", spec.Metadata.Name)
-	provider := "container" // // For containers, we don't have a specific provider
+	provider := "container"
 	if label, ok := spec.Metadata.Labels["provider"]; ok {
 		provider = label
 	}
@@ -69,36 +74,77 @@ func (lc *Lifecycle) CreateContainer(spec *model.ContainerSpec) error {
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer func() {
-		// Release lock on any error
 		if err != nil {
 			lc.logger.Debugf("Releasing lock due to error")
 			_ = lc.lockManager.ReleaseLock(spec.Metadata.Name)
 		}
 	}()
 
-	// 4. Setup cgroup manager
-	cgroupMgr := NewCgroupManager(spec.Metadata.Name)
+	// 3. Delegate to backend
+	lc.logger.Infof("Creating container via backend: %v", spec.Process.Command)
 
-	// 5. Create container (namespace + mounts + cgroups + process)
-	lc.logger.Infof("Creating container and launching process: %v", spec.Process.Command)
-
-	if err := lc.namespaceManager.CreateContainer(spec, cgroupMgr); err != nil {
+	if _, err = lc.backend.Start(spec); err != nil {
 		return fmt.Errorf("container creation failed: %w", err)
 	}
 
-	// 6. Cleanup after process exits
+	// 4. Cleanup after process exits
 	lc.logger.Infof("Process exited, cleaning up")
 
-	// Release lock
 	if err := lc.lockManager.ReleaseLock(spec.Metadata.Name); err != nil {
 		lc.logger.Warnf("Failed to release lock: %v", err)
 	}
 
-	lc.logger.Infof("Container %s unmounted successfully", spec.Metadata.Name)
+	lc.logger.Infof("Container %s stopped successfully", spec.Metadata.Name)
 	return nil
 }
 
-// Mount mounts a workspace and launches the provider.
+// Stop stops a running container by name.
+func (lc *Lifecycle) Stop(name string, force bool) error {
+	lc.logger.Infof("Stopping container %s (force=%v)", name, force)
+
+	lock, err := lc.lockManager.GetLock(name)
+	if err != nil {
+		lc.logger.Warnf("No lock found for container %s, attempting cleanup anyway", name)
+	} else {
+		lc.logger.Infof("Found lock for container %s (PID %d, provider %s)", name, lock.PID, lock.Provider)
+
+		if force {
+			if err := lc.lockManager.ForceRelease(name); err != nil {
+				return fmt.Errorf("failed to force release lock: %w", err)
+			}
+		} else {
+			if err := lc.lockManager.ReleaseLock(name); err != nil {
+				return fmt.Errorf("failed to release lock: %w (use --force to terminate the process)", err)
+			}
+		}
+	}
+
+	if err := lc.backend.Stop(name, force); err != nil {
+		lc.logger.Warnf("Backend stop: %v", err)
+	}
+
+	lc.logger.Infof("Container %s stopped successfully", name)
+	return nil
+}
+
+// Destroy destroys a container and cleans up all resources.
+func (lc *Lifecycle) Destroy(name string) error {
+	lc.logger.Infof("Destroying container %s", name)
+
+	if err := lc.backend.Destroy(name); err != nil {
+		lc.logger.Warnf("Backend destroy: %v", err)
+	}
+
+	lc.logger.Infof("Container %s destroyed", name)
+	return nil
+}
+
+// CreateContainer is an alias for Start (backward compatibility).
+func (lc *Lifecycle) CreateContainer(spec *model.ContainerSpec) error {
+	return lc.Start(spec)
+}
+
+// Mount mounts a workspace and launches the provider (legacy workspace path).
 func (lc *Lifecycle) Mount(workspace *model.Workspace, provider string, providerBinary string) error {
 	timer := metrics.NewTimer("mount.total", map[string]string{
 		"workspace": workspace.Name,
@@ -132,7 +178,6 @@ func (lc *Lifecycle) Mount(workspace *model.Workspace, provider string, provider
 		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 	defer func() {
-		// Release lock on any error
 		if err != nil {
 			lc.logger.Debugf("Releasing lock due to error")
 			_ = lc.lockManager.ReleaseLock(workspace.Name)
@@ -168,12 +213,10 @@ func (lc *Lifecycle) Mount(workspace *model.Workspace, provider string, provider
 	// 7. Cleanup after provider exits
 	lc.logger.Infof("Provider exited, cleaning up")
 
-	// Release lock
 	if err := lc.lockManager.ReleaseLock(workspace.Name); err != nil {
 		lc.logger.Warnf("Failed to release lock: %v", err)
 	}
 
-	// Cleanup mount point
 	if err := lc.bindMounter.Cleanup(mountPath); err != nil {
 		lc.logger.Warnf("Failed to cleanup mount point: %v", err)
 	}
@@ -186,7 +229,6 @@ func (lc *Lifecycle) Mount(workspace *model.Workspace, provider string, provider
 func (lc *Lifecycle) Unmount(workspace string, force bool) error {
 	lc.logger.Infof("Unmounting workspace %s (force=%v)", workspace, force)
 
-	// Check if workspace is locked
 	lock, err := lc.lockManager.GetLock(workspace)
 	if err != nil {
 		lc.logger.Warnf("No lock found for workspace %s, attempting cleanup anyway", workspace)
@@ -194,19 +236,16 @@ func (lc *Lifecycle) Unmount(workspace string, force bool) error {
 		lc.logger.Infof("Found lock for workspace %s (PID %d, provider %s)", workspace, lock.PID, lock.Provider)
 
 		if force {
-			// Force release (terminate process)
 			if err := lc.lockManager.ForceRelease(workspace); err != nil {
 				return fmt.Errorf("failed to force release lock: %w", err)
 			}
 		} else {
-			// Try to release gracefully
 			if err := lc.lockManager.ReleaseLock(workspace); err != nil {
 				return fmt.Errorf("failed to release lock: %w (use --force to terminate the process)", err)
 			}
 		}
 	}
 
-	// Cleanup mount point
 	mountPath := config.GetMountPath(workspace)
 	if err := lc.bindMounter.Cleanup(mountPath); err != nil {
 		lc.logger.Warnf("Failed to cleanup mount point: %v", err)

@@ -11,11 +11,13 @@ import (
 // ContainerSpec represents a container specification conforming to MSB-SPC-2026-001.
 type ContainerSpec struct {
 	Version    string            `yaml:"version"`
-	Metadata   ContainerMetadata      `yaml:"metadata"`
+	Metadata   ContainerMetadata `yaml:"metadata"`
 	Process    ProcessSpec       `yaml:"process"`
 	Namespaces NamespaceSpec     `yaml:"namespaces"`
 	Mounts     []MountSpec       `yaml:"mounts"`
 	Resources  *ResourceSpec     `yaml:"resources,omitempty"`
+	Image      string            `yaml:"image,omitempty"`   // OCI image ref (required for kata)
+	Runtime    string            `yaml:"runtime,omitempty"` // "" or "namespace" = Phase 1, "kata" = CRI
 }
 
 // ContainerMetadata contains container metadata.
@@ -126,6 +128,18 @@ func (j *ContainerSpec) Validate() error {
 		if err := j.Resources.Validate(); err != nil {
 			return fmt.Errorf("invalid resources: %w", err)
 		}
+	}
+
+	// Validate runtime
+	switch j.Runtime {
+	case "", "namespace":
+		// Phase 1 namespace backend, no extra requirements
+	case "kata":
+		if j.Image == "" {
+			return fmt.Errorf("image is required when runtime is \"kata\"")
+		}
+	default:
+		return fmt.Errorf("unsupported runtime: %s (must be \"\", \"namespace\", or \"kata\")", j.Runtime)
 	}
 
 	return nil

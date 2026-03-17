@@ -9,7 +9,7 @@ import (
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/dpopsuev/misbah/provider"
 	"github.com/dpopsuev/misbah/validate"
 )
@@ -18,7 +18,7 @@ import (
 type Server struct {
 	logger    *metrics.Logger
 	recorder  *metrics.MetricsRecorder
-	lifecycle *mount.Lifecycle
+	lifecycle *runtime.Lifecycle
 }
 
 // NewServer creates a new MCP server.
@@ -33,7 +33,7 @@ func NewServer(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Serve
 	return &Server{
 		logger:    logger,
 		recorder:  recorder,
-		lifecycle: mount.NewLifecycle(logger, recorder),
+		lifecycle: runtime.NewLifecycle(logger, recorder),
 	}
 }
 

@@ -24,6 +24,15 @@ type Lock struct {
 
 	// User is the username that acquired the lock.
 	User string `json:"user"`
+
+	// ContainerID is the CRI container ID (set when using kata runtime).
+	ContainerID string `json:"container_id,omitempty"`
+
+	// SandboxID is the CRI pod sandbox ID (set when using kata runtime).
+	SandboxID string `json:"sandbox_id,omitempty"`
+
+	// Runtime is the container runtime backend ("namespace" or "kata").
+	Runtime string `json:"runtime,omitempty"`
 }
 
 // NewLock creates a new lock for the given workspace and provider.

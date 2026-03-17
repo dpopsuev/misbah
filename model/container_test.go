@@ -205,6 +205,85 @@ func TestContainerSpecValidate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "invalid mount type",
 		},
+		{
+			name: "valid namespace runtime",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "namespace",
+			},
+			wantErr: false,
+		},
+		{
+			name: "valid kata runtime with image",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "kata",
+				Image:   "docker.io/library/alpine:latest",
+			},
+			wantErr: false,
+		},
+		{
+			name: "kata runtime without image",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "kata",
+			},
+			wantErr: true,
+			errMsg:  "image is required",
+		},
+		{
+			name: "unsupported runtime",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "docker",
+			},
+			wantErr: true,
+			errMsg:  "unsupported runtime",
+		},
 	}
 
 	for _, tt := range tests {

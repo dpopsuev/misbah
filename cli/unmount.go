@@ -3,7 +3,7 @@ package cli
 import (
 	"fmt"
 
-	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -38,7 +38,7 @@ func runUnmount(cmd *cobra.Command, args []string) error {
 	logger.Infof("Unmounting workspace: %s (force=%v)", unmountWorkspace, unmountForce)
 
 	// Create lifecycle manager
-	lifecycle := mount.NewLifecycle(logger, recorder)
+	lifecycle := runtime.NewLifecycle(logger, recorder)
 
 	// Unmount workspace
 	if err := lifecycle.Unmount(unmountWorkspace, unmountForce); err != nil {

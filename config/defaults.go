@@ -56,6 +56,19 @@ const (
 
 	// EnvLockPID is set to the lock PID.
 	EnvLockPID = "MISBAH_LOCK_PID"
+
+	// EnvCRIEndpoint overrides the CRI endpoint.
+	EnvCRIEndpoint = "MISBAH_CRI_ENDPOINT"
+
+	// EnvRuntimeHandler overrides the default runtime handler.
+	EnvRuntimeHandler = "MISBAH_RUNTIME_HANDLER"
+)
+
+// CRI defaults.
+const (
+	DefaultCRIEndpoint    = "unix:///run/containerd/containerd.sock"
+	DefaultRuntimeHandler = "kata"
+	DefaultCRITimeout     = 120
 )
 
 // GetConfigDir returns the configuration directory path.
@@ -106,4 +119,20 @@ func GetLockPath(workspace string) string {
 // GetMountPath returns the mount path for a workspace.
 func GetMountPath(workspace string) string {
 	return filepath.Join(GetTempDir(), workspace)
+}
+
+// GetCRIEndpoint returns the CRI endpoint, checking env override first.
+func GetCRIEndpoint() string {
+	if ep := os.Getenv(EnvCRIEndpoint); ep != "" {
+		return ep
+	}
+	return DefaultCRIEndpoint
+}
+
+// GetRuntimeHandler returns the runtime handler, checking env override first.
+func GetRuntimeHandler() string {
+	if rh := os.Getenv(EnvRuntimeHandler); rh != "" {
+		return rh
+	}
+	return DefaultRuntimeHandler
 }

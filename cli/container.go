@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/cri"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/mount"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -15,6 +17,8 @@ var (
 	containerName     string
 	containerCommand  []string
 	containerForce    bool
+	containerImage    string
+	containerRuntime  string
 )
 
 // containerCmd represents the container command (parent for subcommands).
@@ -177,6 +181,7 @@ func init() {
 	containerCreateCmd.Flags().StringVar(&containerSpecFile, "spec", "", "Container specification file path (required)")
 	containerCreateCmd.Flags().StringVar(&containerName, "name", "", "Container name (required)")
 	containerCreateCmd.Flags().StringSliceVar(&containerCommand, "command", []string{"/bin/bash"}, "Command to execute in container")
+	containerCreateCmd.Flags().StringVar(&containerImage, "image", "", "OCI image reference (required for kata runtime)")
 	containerCreateCmd.MarkFlagRequired("spec")
 	containerCreateCmd.MarkFlagRequired("name")
 
@@ -186,6 +191,7 @@ func init() {
 
 	// Flags for start subcommand
 	containerStartCmd.Flags().StringVar(&containerSpecFile, "spec", "", "Container specification file path (required)")
+	containerStartCmd.Flags().StringVar(&containerRuntime, "runtime", "", "Container runtime (namespace or kata)")
 	containerStartCmd.MarkFlagRequired("spec")
 
 	// Flags for stop subcommand
@@ -235,6 +241,7 @@ func runContainerCreate(cmd *cobra.Command, args []string) error {
 				Options:     []string{"rw"},
 			},
 		},
+		Image: containerImage,
 	}
 
 	// Save to file
@@ -293,16 +300,37 @@ func runContainerStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load container spec: %w", err)
 	}
 
-	logger.Infof("Loaded container specification: %s", spec.Metadata.Name)
+	// CLI --runtime flag overrides spec
+	if containerRuntime != "" {
+		spec.Runtime = containerRuntime
+	}
 
-	// Create lifecycle manager
-	lifecycle := mount.NewLifecycle(logger, recorder)
+	logger.Infof("Loaded container specification: %s (runtime=%s)", spec.Metadata.Name, spec.Runtime)
 
-	// // Mount and execute container
+	// Select backend based on runtime
+	var backend runtime.ContainerBackend
+	if spec.Runtime == "kata" {
+		endpoint := config.GetCRIEndpoint()
+		if ep, _ := cmd.Flags().GetString("cri-endpoint"); ep != "" {
+			endpoint = ep
+		}
+		handler := config.GetRuntimeHandler()
+
+		b, err := cri.NewBackend(endpoint, handler, logger)
+		if err != nil {
+			return fmt.Errorf("failed to create CRI backend: %w", err)
+		}
+		defer b.Close()
+		backend = b
+	}
+
+	// Create lifecycle manager with selected backend
+	lifecycle := runtime.NewLifecycle(logger, recorder, backend)
+
 	logger.Infof("Mounting container: %s", spec.Metadata.Name)
 
-	if err := lifecycle.CreateContainer(spec); err != nil {
-		return fmt.Errorf("failed to mount container: %w", err)
+	if err := lifecycle.Start(spec); err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
 	}
 
 	logger.Infof("Container %s exited successfully", spec.Metadata.Name)
@@ -332,7 +360,7 @@ func runContainerList(cmd *cobra.Command, args []string) error {
 	logger.Infof("Running containers:")
 	logger.Infof("")
 
-	lockMgr := mount.NewLockManager(logger)
+	lockMgr := runtime.NewLockManager(logger)
 
 	for _, entry := range entries {
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".lock" {
@@ -361,7 +389,7 @@ func runContainerStop(cmd *cobra.Command, args []string) error {
 	logger.Infof("Stopping container: %s (force=%v)", containerName, containerForce)
 
 	// Create lock manager
-	lockMgr := mount.NewLockManager(logger)
+	lockMgr := runtime.NewLockManager(logger)
 
 	// Check if container is running
 	lock, err := lockMgr.GetLock(containerName)
@@ -461,7 +489,7 @@ func runContainerInspect(cmd *cobra.Command, args []string) error {
 		logger.Infof("")
 		logger.Infof("Inspecting running container: %s", containerName)
 
-		lockMgr := mount.NewLockManager(logger)
+		lockMgr := runtime.NewLockManager(logger)
 		lock, err := lockMgr.GetLock(containerName)
 		if err != nil {
 			logger.Infof("  Status: Not running")
@@ -493,7 +521,7 @@ func runContainerInspect(cmd *cobra.Command, args []string) error {
 func runContainerDestroy(cmd *cobra.Command, args []string) error {
 	logger.Infof("Destroying container: %s (force=%v)", containerName, containerForce)
 
-	lockMgr := mount.NewLockManager(logger)
+	lockMgr := runtime.NewLockManager(logger)
 
 	// Check if container is running
 	lock, err := lockMgr.GetLock(containerName)
@@ -515,7 +543,7 @@ func runContainerDestroy(cmd *cobra.Command, args []string) error {
 	}
 
 	// Clean up cgroup (if exists)
-	cgroupMgr := mount.NewCgroupManager(containerName)
+	cgroupMgr := runtime.NewCgroupManager(containerName)
 	if err := cgroupMgr.Cleanup(); err != nil {
 		logger.Debugf("Cgroup cleanup: %v", err)
 	}
