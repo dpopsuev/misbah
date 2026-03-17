@@ -6,6 +6,7 @@ import (
 	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
 func TestMountsToContainerMounts(t *testing.T) {
@@ -193,6 +194,51 @@ func TestBuildContainerConfig_NoResources(t *testing.T) {
 
 	config := BuildContainerConfig(spec)
 	assert.Nil(t, config.Linux)
+}
+
+func TestApplyNetworkConfig_Nil(t *testing.T) {
+	config := BuildPodSandboxConfig("test")
+	ApplyNetworkConfig(config, nil)
+	// Should be unchanged
+	assert.Empty(t, config.Hostname)
+	assert.Nil(t, config.DnsConfig)
+}
+
+func TestApplyNetworkConfig_Full(t *testing.T) {
+	config := BuildPodSandboxConfig("test")
+	network := &model.NetworkConfig{
+		Mode:       "none",
+		DNSServers: []string{"8.8.8.8", "8.8.4.4"},
+		DNSSearch:  []string{"misbah.local"},
+		Hostname:   "agent-01",
+	}
+	ApplyNetworkConfig(config, network)
+
+	assert.Equal(t, "agent-01", config.Hostname)
+	require.NotNil(t, config.DnsConfig)
+	assert.Equal(t, []string{"8.8.8.8", "8.8.4.4"}, config.DnsConfig.Servers)
+	assert.Equal(t, []string{"misbah.local"}, config.DnsConfig.Searches)
+	require.NotNil(t, config.Linux.SecurityContext)
+	require.NotNil(t, config.Linux.SecurityContext.NamespaceOptions)
+}
+
+func TestApplyNetworkConfig_HostMode(t *testing.T) {
+	config := BuildPodSandboxConfig("test")
+	network := &model.NetworkConfig{Mode: "host"}
+	ApplyNetworkConfig(config, network)
+
+	require.NotNil(t, config.Linux.SecurityContext)
+	assert.Equal(t, runtimeapi.NamespaceMode_NODE, config.Linux.SecurityContext.NamespaceOptions.Network)
+}
+
+func TestApplyNetworkConfig_PodMode(t *testing.T) {
+	config := BuildPodSandboxConfig("test")
+	network := &model.NetworkConfig{Mode: "pod", Hostname: "my-agent"}
+	ApplyNetworkConfig(config, network)
+
+	assert.Equal(t, "my-agent", config.Hostname)
+	// Pod mode = default, no security context override
+	assert.Nil(t, config.Linux.SecurityContext)
 }
 
 func TestParseMemoryToBytes(t *testing.T) {

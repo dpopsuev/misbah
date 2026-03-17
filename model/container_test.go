@@ -284,6 +284,55 @@ func TestContainerSpecValidate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "unsupported runtime",
 		},
+		{
+			name: "valid network config",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "kata",
+				Image:   "alpine:latest",
+				Network: &NetworkConfig{
+					Mode:       "none",
+					DNSServers: []string{"8.8.8.8"},
+					Hostname:   "agent-01",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid network mode",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Runtime: "kata",
+				Image:   "alpine:latest",
+				Network: &NetworkConfig{
+					Mode: "bridge",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid network mode",
+		},
 	}
 
 	for _, tt := range tests {

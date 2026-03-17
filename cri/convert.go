@@ -87,6 +87,44 @@ func BuildPodSandboxConfig(name string) *runtimeapi.PodSandboxConfig {
 	}
 }
 
+// ApplyNetworkConfig applies NetworkConfig to a PodSandboxConfig.
+func ApplyNetworkConfig(sandboxConfig *runtimeapi.PodSandboxConfig, network *model.NetworkConfig) {
+	if network == nil {
+		return
+	}
+
+	if network.Hostname != "" {
+		sandboxConfig.Hostname = network.Hostname
+	}
+
+	if len(network.DNSServers) > 0 || len(network.DNSSearch) > 0 {
+		sandboxConfig.DnsConfig = &runtimeapi.DNSConfig{
+			Servers:  network.DNSServers,
+			Searches: network.DNSSearch,
+		}
+	}
+
+	if sandboxConfig.Linux == nil {
+		sandboxConfig.Linux = &runtimeapi.LinuxPodSandboxConfig{}
+	}
+
+	switch network.Mode {
+	case "none":
+		sandboxConfig.Linux.SecurityContext = &runtimeapi.LinuxSandboxSecurityContext{
+			NamespaceOptions: &runtimeapi.NamespaceOption{
+				Network: runtimeapi.NamespaceMode_TARGET,
+			},
+		}
+	case "host":
+		sandboxConfig.Linux.SecurityContext = &runtimeapi.LinuxSandboxSecurityContext{
+			NamespaceOptions: &runtimeapi.NamespaceOption{
+				Network: runtimeapi.NamespaceMode_NODE,
+			},
+		}
+	// "pod" or "" = default CRI behavior (own network namespace)
+	}
+}
+
 // BuildContainerConfig creates a ContainerConfig from a ContainerSpec.
 func BuildContainerConfig(spec *model.ContainerSpec) *runtimeapi.ContainerConfig {
 	config := &runtimeapi.ContainerConfig{

@@ -18,6 +18,15 @@ type ContainerSpec struct {
 	Resources  *ResourceSpec     `yaml:"resources,omitempty"`
 	Image      string            `yaml:"image,omitempty"`   // OCI image ref (required for kata)
 	Runtime    string            `yaml:"runtime,omitempty"` // "" or "namespace" = Phase 1, "kata" = CRI
+	Network    *NetworkConfig    `yaml:"network,omitempty"` // Network configuration (kata only)
+}
+
+// NetworkConfig specifies network configuration for CRI containers.
+type NetworkConfig struct {
+	Mode     string   `yaml:"mode,omitempty"`     // "none", "host", "pod" (default: "pod")
+	DNSServers []string `yaml:"dns_servers,omitempty"`
+	DNSSearch  []string `yaml:"dns_search,omitempty"`
+	Hostname   string   `yaml:"hostname,omitempty"`
 }
 
 // ContainerMetadata contains container metadata.
@@ -142,6 +151,24 @@ func (j *ContainerSpec) Validate() error {
 		return fmt.Errorf("unsupported runtime: %s (must be \"\", \"namespace\", or \"kata\")", j.Runtime)
 	}
 
+	// Validate network config (if specified)
+	if j.Network != nil {
+		if err := j.Network.Validate(); err != nil {
+			return fmt.Errorf("invalid network: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// Validate validates network configuration.
+func (n *NetworkConfig) Validate() error {
+	switch n.Mode {
+	case "", "pod", "none", "host":
+		// Valid modes
+	default:
+		return fmt.Errorf("invalid network mode: %s (must be \"none\", \"host\", or \"pod\")", n.Mode)
+	}
 	return nil
 }
 

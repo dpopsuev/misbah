@@ -59,6 +59,7 @@ func (b *Backend) Start(spec *model.ContainerSpec) (string, error) {
 
 	// 2. Create pod sandbox
 	sandboxConfig := BuildPodSandboxConfig(name)
+	ApplyNetworkConfig(sandboxConfig, spec.Network)
 	sandboxID, err := b.client.RunPodSandbox(ctx, name, b.runtimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("run pod sandbox: %w", err)
