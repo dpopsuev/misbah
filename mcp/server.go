@@ -12,6 +12,20 @@ import (
 	"github.com/dpopsuev/misbah/model"
 )
 
+// MCP method names.
+const (
+	MethodInitialize = "initialize"
+	MethodListTools  = "tools/list"
+	MethodCallTool   = "tools/call"
+)
+
+// MCP tool names.
+const (
+	ToolContainerCreate   = "misbah_container_create"
+	ToolContainerValidate = "misbah_container_validate"
+	ToolContainerInspect  = "misbah_container_inspect"
+)
+
 // Server implements the MCP (Model Context Protocol) server for misbah.
 type Server struct {
 	logger   *metrics.Logger
@@ -52,11 +66,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
 
 	switch req.Method {
-	case "initialize":
+	case MethodInitialize:
 		result, err = s.handleInitialize(r.Context(), req.Params)
-	case "tools/list":
+	case MethodListTools:
 		result, err = s.handleListTools(r.Context())
-	case "tools/call":
+	case MethodCallTool:
 		result, err = s.handleCallTool(r.Context(), req.Params)
 	default:
 		s.writeError(w, http.StatusNotFound, fmt.Sprintf("unknown method: %s", req.Method))
@@ -151,7 +165,7 @@ func (s *Server) handleInitialize(ctx context.Context, params json.RawMessage) (
 func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 	tools := []Tool{
 		{
-			Name:        "misbah_container_create",
+			Name:        ToolContainerCreate,
 			Description: "Create a new container specification file",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -165,7 +179,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "misbah_container_validate",
+			Name:        ToolContainerValidate,
 			Description: "Validate a container specification file",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -176,7 +190,7 @@ func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 			}`),
 		},
 		{
-			Name:        "misbah_container_inspect",
+			Name:        ToolContainerInspect,
 			Description: "Load and display a container specification",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
@@ -208,11 +222,11 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	s.logger.Debugf("MCP tool call: %s", call.Name)
 
 	switch call.Name {
-	case "misbah_container_create":
+	case ToolContainerCreate:
 		return s.toolContainerCreate(ctx, call.Arguments)
-	case "misbah_container_validate":
+	case ToolContainerValidate:
 		return s.toolContainerValidate(ctx, call.Arguments)
-	case "misbah_container_inspect":
+	case ToolContainerInspect:
 		return s.toolContainerInspect(ctx, call.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", call.Name)
