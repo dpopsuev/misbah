@@ -1,0 +1,178 @@
+package daemon
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	"github.com/dpopsuev/misbah/metrics"
+)
+
+// Server is the permission daemon HTTP server on a Unix socket.
+type Server struct {
+	whitelist  *WhitelistStore
+	prompter   Prompter
+	audit      *AuditLogger
+	logger     *metrics.Logger
+	listener   net.Listener
+	httpServer *http.Server
+}
+
+// NewServer creates a new permission daemon server.
+func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger, logger *metrics.Logger) *Server {
+	if logger == nil {
+		logger = metrics.GetDefaultLogger()
+	}
+	return &Server{
+		whitelist: whitelist,
+		prompter:  prompter,
+		audit:     audit,
+		logger:    logger,
+	}
+}
+
+// Start listens on the given Unix socket path and serves requests.
+func (s *Server) Start(socketPath string) error {
+	// Ensure parent directory exists
+	dir := filepath.Dir(socketPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create socket directory: %w", err)
+	}
+
+	// Remove stale socket file
+	if err := os.Remove(socketPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove existing socket: %w", err)
+	}
+
+	ln, err := net.Listen("unix", socketPath)
+	if err != nil {
+		return fmt.Errorf("failed to listen on socket: %w", err)
+	}
+	s.listener = ln
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/permission/request", s.handleRequest)
+	mux.HandleFunc("/permission/check", s.handleCheck)
+	mux.HandleFunc("/permission/list", s.handleList)
+
+	s.httpServer = &http.Server{Handler: mux}
+
+	s.logger.Infof("Permission daemon listening on %s", socketPath)
+
+	if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("server error: %w", err)
+	}
+
+	return nil
+}
+
+// Stop gracefully shuts down the server.
+func (s *Server) Stop() error {
+	if s.httpServer != nil {
+		s.logger.Infof("Shutting down permission daemon")
+		return s.httpServer.Shutdown(context.Background())
+	}
+	return nil
+}
+
+// handleRequest is the full permission flow: whitelist check -> prompt -> persist.
+func (s *Server) handleRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req PermissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	// Check whitelist for ALWAYS or DENY
+	if decision, ok := s.whitelist.Check(req.ResourceType, req.ResourceID); ok {
+		if decision == DecisionAlways || decision == DecisionDeny {
+			s.logger.Debugf("Whitelist hit: %s:%s -> %s", req.ResourceType, req.ResourceID, decision)
+			if s.audit != nil {
+				s.audit.LogDecision(req, decision, "whitelist")
+			}
+			s.writeJSON(w, PermissionResponse{Decision: decision, Reason: "whitelist"})
+			return
+		}
+	}
+
+	// Prompt user
+	decision, err := s.prompter.Prompt(&req)
+	if err != nil {
+		s.logger.Errorf("Prompter error: %v", err)
+		decision = DecisionDeny
+	}
+
+	// Persist ALWAYS and DENY decisions
+	if decision == DecisionAlways || decision == DecisionDeny {
+		s.whitelist.Set(req.ResourceType, req.ResourceID, decision)
+		if err := s.whitelist.Save(); err != nil {
+			s.logger.Errorf("Failed to save whitelist: %v", err)
+		}
+	}
+
+	if s.audit != nil {
+		s.audit.LogDecision(req, decision, "user")
+	}
+
+	s.writeJSON(w, PermissionResponse{Decision: decision})
+}
+
+// handleCheck is the fast path: whitelist lookup only, no prompt.
+func (s *Server) handleCheck(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req PermissionRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	decision, ok := s.whitelist.Check(req.ResourceType, req.ResourceID)
+	if !ok {
+		s.writeJSON(w, PermissionResponse{Decision: DecisionUnknown})
+		return
+	}
+
+	s.writeJSON(w, PermissionResponse{Decision: decision})
+}
+
+// handleList returns all whitelist rules.
+func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+
+	rules := s.whitelist.Rules()
+
+	// Convert to string map for JSON
+	out := make(map[string]string, len(rules))
+	for k, v := range rules {
+		out[k] = string(v)
+	}
+
+	s.writeJSON(w, map[string]interface{}{"rules": out})
+}
+
+func (s *Server) writeJSON(w http.ResponseWriter, v interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(v)
+}
+
+func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}

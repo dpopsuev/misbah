@@ -19,8 +19,9 @@ type ContainerSpec struct {
 	Image      string            `yaml:"image,omitempty"`   // OCI image ref (required for kata)
 	Runtime    string            `yaml:"runtime,omitempty"` // "" or "namespace" = Phase 1, "kata" = CRI
 	Network    *NetworkConfig    `yaml:"network,omitempty"` // Network configuration (kata only)
-	TierConfig *TierConfig       `yaml:"tier,omitempty"`     // Tier-scoped mount configuration
-	Nesting    *NestingConfig    `yaml:"nesting,omitempty"`  // Nesting configuration for recursive containers
+	TierConfig  *TierConfig       `yaml:"tier,omitempty"`         // Tier-scoped mount configuration
+	Nesting     *NestingConfig    `yaml:"nesting,omitempty"`     // Nesting configuration for recursive containers
+	Permissions *PermissionConfig `yaml:"permissions,omitempty"` // Permission daemon configuration
 }
 
 // NetworkConfig specifies network configuration for CRI containers.
@@ -77,6 +78,25 @@ func (t *TierConfig) Validate() error {
 		return fmt.Errorf("eco tier must not have writable paths (read-only)")
 	}
 
+	return nil
+}
+
+// PermissionConfig specifies permission daemon configuration for progressive trust.
+type PermissionConfig struct {
+	NetworkWhitelist []string `yaml:"network_whitelist,omitempty"` // allowed domains
+	MCPWhitelist     []string `yaml:"mcp_whitelist,omitempty"`     // allowed MCP tools
+	PackageWhitelist []string `yaml:"package_whitelist,omitempty"` // allowed packages
+	DefaultPolicy    string   `yaml:"default_policy,omitempty"`    // "deny" (default) or "prompt"
+}
+
+// Validate validates permission configuration.
+func (p *PermissionConfig) Validate() error {
+	switch p.DefaultPolicy {
+	case "", "deny", "prompt":
+		// Valid policies
+	default:
+		return fmt.Errorf("invalid default_policy: %q (must be \"deny\" or \"prompt\")", p.DefaultPolicy)
+	}
 	return nil
 }
 
@@ -228,6 +248,13 @@ func (j *ContainerSpec) Validate() error {
 	if j.Nesting != nil {
 		if err := j.Nesting.Validate(); err != nil {
 			return fmt.Errorf("invalid nesting: %w", err)
+		}
+	}
+
+	// Validate permissions config (if specified)
+	if j.Permissions != nil {
+		if err := j.Permissions.Validate(); err != nil {
+			return fmt.Errorf("invalid permissions: %w", err)
 		}
 	}
 

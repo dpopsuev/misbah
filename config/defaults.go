@@ -37,8 +37,18 @@ const (
 	DefaultContainerWorkspace = "/container/workspace"
 )
 
+// Permission daemon defaults.
+const (
+	DefaultDaemonSocket  = "/run/misbah/permission.sock"
+	DefaultAuditLogPath  = "audit.log"
+	DefaultWhitelistPath = "whitelist.yaml"
+)
+
 // Environment variable names.
 const (
+	// EnvDaemonSocket overrides the daemon socket path.
+	EnvDaemonSocket = "MISBAH_DAEMON_SOCKET"
+
 	// EnvConfigDir overrides the config directory.
 	EnvConfigDir = "MISBAH_CONFIG_DIR"
 
@@ -135,4 +145,22 @@ func GetRuntimeHandler() string {
 		return rh
 	}
 	return DefaultRuntimeHandler
+}
+
+// GetDaemonSocket returns the daemon socket path, checking env override first.
+func GetDaemonSocket() string {
+	if sock := os.Getenv(EnvDaemonSocket); sock != "" {
+		return sock
+	}
+	return DefaultDaemonSocket
+}
+
+// GetAuditLogPath returns the audit log path (relative to config dir).
+func GetAuditLogPath() string {
+	return filepath.Join(GetConfigDir(), DefaultAuditLogPath)
+}
+
+// GetWhitelistPath returns the whitelist file path (relative to config dir).
+func GetWhitelistPath() string {
+	return filepath.Join(GetConfigDir(), DefaultWhitelistPath)
 }

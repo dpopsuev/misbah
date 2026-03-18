@@ -471,6 +471,70 @@ func TestContainerSpecValidate(t *testing.T) {
 			errMsg:  "invalid nesting permission_policy",
 		},
 		{
+			name: "valid permissions config",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Permissions: &PermissionConfig{
+					NetworkWhitelist: []string{"api.github.com"},
+					MCPWhitelist:     []string{"bash", "read"},
+					PackageWhitelist: []string{"numpy"},
+					DefaultPolicy:    "prompt",
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "nil permissions config (backward compat)",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid permissions default_policy",
+			spec: &ContainerSpec{
+				Version: "1.0",
+				Metadata: ContainerMetadata{
+					Name: "test-container",
+				},
+				Process: ProcessSpec{
+					Command: []string{"/bin/bash"},
+					Cwd:     "/container/workspace",
+				},
+				Namespaces: NamespaceSpec{
+					User:  true,
+					Mount: true,
+				},
+				Permissions: &PermissionConfig{
+					DefaultPolicy: "allow-all",
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid default_policy",
+		},
+		{
 			name: "nil tier config (backward compat)",
 			spec: &ContainerSpec{
 				Version: "1.0",
