@@ -17,93 +17,51 @@ const (
 	testContainer = "misbah-e2e-test"
 )
 
-// TestBasicWorkflow tests the complete workspace lifecycle without LLM
+// TestBasicWorkflow tests the container spec lifecycle via CLI
 func TestBasicWorkflow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
 	}
 
-	// Build misbah binary
 	root := repoRoot(t)
-	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
+	misbahBin := filepath.Join(root, "misbah")
+	runInDir(t, root, "go", "build", "-o", misbahBin, "./cmd/misbah")
+	defer os.Remove(misbahBin)
 
-	// Setup
-	workspace := "e2e-test-" + time.Now().Format("20060102-150405")
 	testDir := t.TempDir()
+	containerName := "e2e-basic-" + time.Now().Format("20060102-150405")
+	specFile := filepath.Join(testDir, "test-container.yaml")
 
-	sourceA := filepath.Join(testDir, "source-a")
-	sourceB := filepath.Join(testDir, "source-b")
-
-	if err := os.MkdirAll(sourceA, 0755); err != nil {
-		t.Fatalf("Failed to create source-a: %v", err)
-	}
-	if err := os.MkdirAll(sourceB, 0755); err != nil {
-		t.Fatalf("Failed to create source-b: %v", err)
-	}
-
-	// Write test files
-	if err := os.WriteFile(filepath.Join(sourceA, "test.txt"), []byte("test-a"), 0644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(sourceB, "test.txt"), []byte("test-b"), 0644); err != nil {
-		t.Fatalf("Failed to write test file: %v", err)
-	}
-
-	jabalBin := filepath.Join(root, "misbah")
-
-	defer func() {
-		// Cleanup workspace
-		// Try unmount, ignore errors (may not be mounted)
-		exec.Command(jabalBin, "unmount", "-w", workspace, "--force").Run()
-
-		// Always clean workspace directory
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
-		os.RemoveAll(workspaceDir)
-
-		// Assert cleanup worked
-		if _, err := os.Stat(workspaceDir); !os.IsNotExist(err) {
-			t.Errorf("Cleanup failed: workspace directory still exists at %s", workspaceDir)
+	t.Run("create_spec", func(t *testing.T) {
+		output := runOutput(t, misbahBin, "container", "create",
+			"--spec", specFile,
+			"--name", containerName)
+		if !strings.Contains(output, "Container specification created") {
+			t.Fatalf("Unexpected output: %s", output)
 		}
-	}()
-
-	t.Run("create_workspace", func(t *testing.T) {
-		run(t, jabalBin, "create", "-w", workspace, "--description", "E2E test workspace")
-	})
-
-	t.Run("edit_manifest", func(t *testing.T) {
-		manifestPath := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace, "manifest.yaml")
-		manifest := `name: ` + workspace + `
-description: E2E test workspace
-sources:
-  - path: ` + sourceA + `
-    mount: source-a
-  - path: ` + sourceB + `
-    mount: source-b
-providers:
-  claude:
-    mcp_servers:
-      scribe: http://localhost:8080
-`
-		if err := os.WriteFile(manifestPath, []byte(manifest), 0644); err != nil {
-			t.Fatalf("Failed to write manifest: %v", err)
+		if _, err := os.Stat(specFile); os.IsNotExist(err) {
+			t.Fatal("Spec file not created")
 		}
 	})
 
-	t.Run("validate_manifest", func(t *testing.T) {
-		run(t, jabalBin, "validate", "-w", workspace)
-	})
-
-	t.Run("list_workspaces", func(t *testing.T) {
-		out := runOutput(t, jabalBin, "peaks")
-		if !strings.Contains(out, workspace) {
-			t.Fatalf("Workspace not found in peaks output")
+	t.Run("validate_spec", func(t *testing.T) {
+		output := runOutput(t, misbahBin, "container", "validate", "--spec", specFile)
+		if !strings.Contains(output, "valid") {
+			t.Fatalf("Validation failed: %s", output)
 		}
 	})
 
-	t.Run("check_status", func(t *testing.T) {
-		out := runOutput(t, jabalBin, "summit", "-w", workspace)
-		if !strings.Contains(out, "Not mounted") {
-			t.Fatalf("Unexpected status: %s", out)
+	t.Run("inspect_spec", func(t *testing.T) {
+		output := runOutput(t, misbahBin, "container", "inspect", "--spec", specFile)
+		if !strings.Contains(output, containerName) {
+			t.Fatalf("Inspect doesn't contain container name: %s", output)
+		}
+	})
+
+	t.Run("version", func(t *testing.T) {
+		output := runOutput(t, misbahBin, "version")
+		if !strings.Contains(output, "misbah version") {
+			t.Fatalf("Unexpected version output: %s", output)
 		}
 	})
 }

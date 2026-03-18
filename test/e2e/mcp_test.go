@@ -27,41 +27,17 @@ func TestMCPWorkflow(t *testing.T) {
 		t.Skip("E2E tests require Linux")
 	}
 
-	// Build misbah
 	root := repoRoot(t)
 	runInDir(t, root, "go", "build", "-o", "misbah", "./cmd/misbah")
 
-	// Start MCP server
-	jabalBin := filepath.Join(root, "misbah")
-	server := startMCPServer(t, jabalBin)
+	misbahBin := filepath.Join(root, "misbah")
+	server := startMCPServer(t, misbahBin)
 	defer server.Process.Kill()
 
-	// Wait for server to be ready
 	waitForMCPServer(t, 10*time.Second)
 
-	workspace := "mcp-e2e-" + time.Now().Format("20060102-150405")
 	testDir := t.TempDir()
-
-	sourceA := filepath.Join(testDir, "project-a")
-	sourceB := filepath.Join(testDir, "project-b")
-
-	if err := os.MkdirAll(sourceA, 0755); err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
-	if err := os.MkdirAll(sourceB, 0755); err != nil {
-		t.Fatalf("Failed to create source: %v", err)
-	}
-
-	defer func() {
-		// Cleanup workspace
-		workspaceDir := filepath.Join(os.Getenv("HOME"), ".config/misbah/workspaces", workspace)
-		os.RemoveAll(workspaceDir)
-
-		// Assert cleanup worked
-		if _, err := os.Stat(workspaceDir); !os.IsNotExist(err) {
-			t.Errorf("Cleanup failed: workspace directory still exists at %s", workspaceDir)
-		}
-	}()
+	specFile := filepath.Join(testDir, "mcp-test.yaml")
 
 	t.Run("mcp_initialize", func(t *testing.T) {
 		result := mcpCall(t, "initialize", map[string]interface{}{
@@ -75,7 +51,7 @@ func TestMCPWorkflow(t *testing.T) {
 
 		serverInfo := result["serverInfo"].(map[string]interface{})
 		assert(t, serverInfo["name"] == "misbah", "Server name should be 'misbah'")
-		assert(t, serverInfo["version"] == "0.1.0", "Server version should be '0.1.0'")
+		assert(t, serverInfo["version"] == "0.2.0", "Server version should be '0.2.0'")
 	})
 
 	t.Run("mcp_list_tools", func(t *testing.T) {
@@ -84,7 +60,6 @@ func TestMCPWorkflow(t *testing.T) {
 		tools := result["tools"].([]interface{})
 		assert(t, len(tools) > 0, "Should have tools")
 
-		// Verify expected tools exist
 		toolNames := make(map[string]bool)
 		for _, tool := range tools {
 			toolMap := tool.(map[string]interface{})
@@ -92,13 +67,9 @@ func TestMCPWorkflow(t *testing.T) {
 		}
 
 		requiredTools := []string{
-			"jabal_list_workspaces",
-			"jabal_create_workspace",
-			"jabal_get_workspace",
-			"jabal_update_manifest",
-			"jabal_validate_workspace",
-			"jabal_get_status",
-			"jabal_list_providers",
+			"misbah_container_create",
+			"misbah_container_validate",
+			"misbah_container_inspect",
 		}
 
 		for _, toolName := range requiredTools {
@@ -106,83 +77,32 @@ func TestMCPWorkflow(t *testing.T) {
 		}
 	})
 
-	t.Run("mcp_create_workspace", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_create_workspace", map[string]interface{}{
-			"name":        workspace,
-			"description": "MCP E2E test workspace",
+	t.Run("mcp_container_create", func(t *testing.T) {
+		result := mcpCallTool(t, "misbah_container_create", map[string]interface{}{
+			"spec_path": specFile,
+			"name":      "mcp-test-container",
 		})
 
 		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, "created successfully"), "Should report success")
+		assert(t, strings.Contains(content, "Container spec created"), "Should report success")
 	})
 
-	t.Run("mcp_list_workspaces", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_list_workspaces", map[string]interface{}{})
-
-		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, workspace), "Should list the workspace")
-	})
-
-	t.Run("mcp_update_manifest", func(t *testing.T) {
-		manifest := map[string]interface{}{
-			"name":        workspace,
-			"description": "MCP E2E test workspace",
-			"sources": []map[string]interface{}{
-				{"path": sourceA, "mount": "project-a"},
-				{"path": sourceB, "mount": "project-b"},
-			},
-			"providers": map[string]interface{}{
-				"claude": map[string]interface{}{
-					"mcp_servers": map[string]interface{}{
-						"scribe": "http://localhost:8080",
-					},
-				},
-			},
-		}
-
-		result := mcpCallTool(t, "jabal_update_manifest", map[string]interface{}{
-			"name":     workspace,
-			"manifest": manifest,
+	t.Run("mcp_container_validate", func(t *testing.T) {
+		result := mcpCallTool(t, "misbah_container_validate", map[string]interface{}{
+			"spec_path": specFile,
 		})
 
 		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, "updated successfully"), "Should update manifest")
+		assert(t, strings.Contains(content, "valid"), "Should validate successfully")
 	})
 
-	t.Run("mcp_validate_workspace", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_validate_workspace", map[string]interface{}{
-			"name": workspace,
+	t.Run("mcp_container_inspect", func(t *testing.T) {
+		result := mcpCallTool(t, "misbah_container_inspect", map[string]interface{}{
+			"spec_path": specFile,
 		})
 
 		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, "is valid"), "Should validate successfully")
-	})
-
-	t.Run("mcp_get_workspace", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_get_workspace", map[string]interface{}{
-			"name": workspace,
-		})
-
-		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, workspace), "Should return workspace details")
-		assert(t, strings.Contains(content, "project-a"), "Should include sources")
-	})
-
-	t.Run("mcp_get_status", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_get_status", map[string]interface{}{
-			"name": workspace,
-		})
-
-		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, "Mounted"), "Should show mount status")
-	})
-
-	t.Run("mcp_list_providers", func(t *testing.T) {
-		result := mcpCallTool(t, "jabal_list_providers", map[string]interface{}{})
-
-		content := getToolContent(t, result)
-		assert(t, strings.Contains(content, "claude"), "Should list claude provider")
-		assert(t, strings.Contains(content, "aider"), "Should list aider provider")
+		assert(t, strings.Contains(content, "mcp-test-container"), "Should contain container name")
 	})
 }
 
@@ -207,10 +127,10 @@ type mcpError struct {
 	Message string `json:"message"`
 }
 
-func startMCPServer(t *testing.T, jabalBin string) *exec.Cmd {
+func startMCPServer(t *testing.T, misbahBin string) *exec.Cmd {
 	t.Helper()
 
-	cmd := exec.Command(jabalBin, "serve", "--port", "18080", "--log-level", "debug")
+	cmd := exec.Command(misbahBin, "serve", "--port", "18080", "--log-level", "debug")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
