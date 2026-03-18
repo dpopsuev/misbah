@@ -131,6 +131,38 @@ func (f *fakeImageService) PullImage(_ context.Context, req *runtimeapi.PullImag
 	return &runtimeapi.PullImageResponse{ImageRef: ref}, nil
 }
 
+func (f *fakeImageService) ListImages(_ context.Context, req *runtimeapi.ListImagesRequest) (*runtimeapi.ListImagesResponse, error) {
+	var images []*runtimeapi.Image
+	for ref := range f.images {
+		images = append(images, &runtimeapi.Image{
+			Id:       "sha256:" + ref,
+			RepoTags: []string{ref},
+			Size_:    1024 * 1024,
+		})
+	}
+	return &runtimeapi.ListImagesResponse{Images: images}, nil
+}
+
+func (f *fakeImageService) ImageStatus(_ context.Context, req *runtimeapi.ImageStatusRequest) (*runtimeapi.ImageStatusResponse, error) {
+	ref := req.Image.Image
+	if !f.images[ref] {
+		return &runtimeapi.ImageStatusResponse{Image: nil}, nil
+	}
+	return &runtimeapi.ImageStatusResponse{
+		Image: &runtimeapi.Image{
+			Id:       "sha256:" + ref,
+			RepoTags: []string{ref},
+			Size_:    1024 * 1024,
+		},
+	}, nil
+}
+
+func (f *fakeImageService) RemoveImage(_ context.Context, req *runtimeapi.RemoveImageRequest) (*runtimeapi.RemoveImageResponse, error) {
+	ref := req.Image.Image
+	delete(f.images, ref)
+	return &runtimeapi.RemoveImageResponse{}, nil
+}
+
 // startFakeServer starts a fake CRI gRPC server and returns a client connected to it.
 func startFakeServer(t *testing.T) (*Client, func()) {
 	t.Helper()
@@ -288,4 +320,65 @@ func TestClientClose_Nil(t *testing.T) {
 	client := &Client{}
 	err := client.Close()
 	assert.NoError(t, err)
+}
+
+func TestListImages(t *testing.T) {
+	client, cleanup := startFakeServer(t)
+	defer cleanup()
+
+	// Pull some images first
+	ctx := context.Background()
+	require.NoError(t, client.PullImage(ctx, "alpine:latest"))
+	require.NoError(t, client.PullImage(ctx, "ubuntu:22.04"))
+
+	images, err := client.ListImages(ctx)
+	require.NoError(t, err)
+	assert.Len(t, images, 2)
+}
+
+func TestListImages_Empty(t *testing.T) {
+	client, cleanup := startFakeServer(t)
+	defer cleanup()
+
+	images, err := client.ListImages(context.Background())
+	require.NoError(t, err)
+	assert.Empty(t, images)
+}
+
+func TestImageStatus(t *testing.T) {
+	client, cleanup := startFakeServer(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	require.NoError(t, client.PullImage(ctx, "alpine:latest"))
+
+	img, err := client.ImageStatus(ctx, "alpine:latest")
+	require.NoError(t, err)
+	require.NotNil(t, img)
+	assert.Contains(t, img.RepoTags, "alpine:latest")
+}
+
+func TestImageStatus_NotFound(t *testing.T) {
+	client, cleanup := startFakeServer(t)
+	defer cleanup()
+
+	img, err := client.ImageStatus(context.Background(), "nonexistent:latest")
+	require.NoError(t, err)
+	assert.Nil(t, img)
+}
+
+func TestRemoveImage(t *testing.T) {
+	client, cleanup := startFakeServer(t)
+	defer cleanup()
+
+	ctx := context.Background()
+	require.NoError(t, client.PullImage(ctx, "alpine:latest"))
+
+	err := client.RemoveImage(ctx, "alpine:latest")
+	require.NoError(t, err)
+
+	// Verify removed
+	images, err := client.ListImages(ctx)
+	require.NoError(t, err)
+	assert.Empty(t, images)
 }

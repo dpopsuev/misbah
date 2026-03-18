@@ -106,10 +106,18 @@ type NamespaceSpec struct {
 
 // MountSpec specifies a mount operation.
 type MountSpec struct {
-	Type        string   `yaml:"type"`        // bind, tmpfs, proc
-	Source      string   `yaml:"source,omitempty"`
-	Destination string   `yaml:"destination"`
-	Options     []string `yaml:"options,omitempty"` // ro, rw, nosuid, nodev, etc.
+	Type        string        `yaml:"type"`                  // bind, tmpfs, proc, git-clone
+	Source      string        `yaml:"source,omitempty"`
+	Destination string        `yaml:"destination"`
+	Options     []string      `yaml:"options,omitempty"`     // ro, rw, nosuid, nodev, etc.
+	GitClone    *GitCloneSpec `yaml:"git_clone,omitempty"`   // required when type is "git-clone"
+}
+
+// GitCloneSpec specifies a remote repository to clone and mount.
+type GitCloneSpec struct {
+	Repository string `yaml:"repository"`       // remote repo URL (required)
+	Ref        string `yaml:"ref,omitempty"`     // branch, tag, or commit SHA
+	Depth      int    `yaml:"depth,omitempty"`   // shallow clone depth (default 1)
 }
 
 // ResourceSpec specifies resource limits.
@@ -289,8 +297,19 @@ func (m *MountSpec) Validate() error {
 	switch m.Type {
 	case "bind", "tmpfs", "proc":
 		// Valid types
+	case "git-clone":
+		// git-clone requires GitClone spec, source is auto-generated
+		if m.GitClone == nil {
+			return fmt.Errorf("git-clone mount requires git_clone specification")
+		}
+		if m.GitClone.Repository == "" {
+			return fmt.Errorf("git-clone mount requires repository")
+		}
+		if m.Source != "" {
+			return fmt.Errorf("git-clone mount must not specify source (auto-generated)")
+		}
 	default:
-		return fmt.Errorf("invalid mount type: %s (must be bind, tmpfs, or proc)", m.Type)
+		return fmt.Errorf("invalid mount type: %s (must be bind, tmpfs, proc, or git-clone)", m.Type)
 	}
 
 	// Validate destination

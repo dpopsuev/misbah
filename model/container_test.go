@@ -651,6 +651,51 @@ func TestMountSpecValidate(t *testing.T) {
 			wantErr: true,
 			errMsg:  "invalid mount option",
 		},
+		{
+			name: "valid git-clone mount",
+			spec: MountSpec{
+				Type:        "git-clone",
+				Destination: "/workspace/repo",
+				GitClone: &GitCloneSpec{
+					Repository: "https://github.com/user/repo.git",
+					Ref:        "main",
+					Depth:      1,
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "git-clone without spec",
+			spec: MountSpec{
+				Type:        "git-clone",
+				Destination: "/workspace/repo",
+			},
+			wantErr: true,
+			errMsg:  "git-clone mount requires git_clone specification",
+		},
+		{
+			name: "git-clone with empty repository",
+			spec: MountSpec{
+				Type:        "git-clone",
+				Destination: "/workspace/repo",
+				GitClone:    &GitCloneSpec{},
+			},
+			wantErr: true,
+			errMsg:  "git-clone mount requires repository",
+		},
+		{
+			name: "git-clone with source set",
+			spec: MountSpec{
+				Type:        "git-clone",
+				Source:      "/should/not/be/set",
+				Destination: "/workspace/repo",
+				GitClone: &GitCloneSpec{
+					Repository: "https://github.com/user/repo.git",
+				},
+			},
+			wantErr: true,
+			errMsg:  "git-clone mount must not specify source",
+		},
 	}
 
 	for _, tt := range tests {

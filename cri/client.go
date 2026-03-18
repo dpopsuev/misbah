@@ -212,3 +212,34 @@ func (c *Client) ContainerStatus(ctx context.Context, containerID string) (*runt
 
 	return resp.Status, nil
 }
+
+// ListImages lists all images available locally.
+func (c *Client) ListImages(ctx context.Context) ([]*runtimeapi.Image, error) {
+	resp, err := c.image.ListImages(ctx, &runtimeapi.ListImagesRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to list images: %w", err)
+	}
+	return resp.Images, nil
+}
+
+// ImageStatus returns the status of a specific image.
+func (c *Client) ImageStatus(ctx context.Context, imageRef string) (*runtimeapi.Image, error) {
+	resp, err := c.image.ImageStatus(ctx, &runtimeapi.ImageStatusRequest{
+		Image: &runtimeapi.ImageSpec{Image: imageRef},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image status %s: %w", imageRef, err)
+	}
+	return resp.Image, nil
+}
+
+// RemoveImage removes an image.
+func (c *Client) RemoveImage(ctx context.Context, imageRef string) error {
+	_, err := c.image.RemoveImage(ctx, &runtimeapi.RemoveImageRequest{
+		Image: &runtimeapi.ImageSpec{Image: imageRef},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to remove image %s: %w", imageRef, err)
+	}
+	return nil
+}

@@ -81,7 +81,21 @@ func (lc *Lifecycle) Start(spec *model.ContainerSpec) error {
 		}
 	}()
 
-	// 3. Resolve tier mounts (if configured)
+	// 3. Resolve git-clone mounts
+	gitMgr := NewGitCloneManager(lc.logger, config.GetTempDir())
+	resolvedMounts, gitErr := gitMgr.ResolveGitCloneMounts(spec.Mounts)
+	if gitErr != nil {
+		err = fmt.Errorf("git-clone mount resolution failed: %w", gitErr)
+		return err
+	}
+	spec.Mounts = resolvedMounts
+	defer func() {
+		if cleanErr := gitMgr.Cleanup(); cleanErr != nil {
+			lc.logger.Warnf("Failed to clean up git clones: %v", cleanErr)
+		}
+	}()
+
+	// 4. Resolve tier mounts (if configured)
 	if spec.TierConfig != nil {
 		lc.logger.Infof("Resolving tier mounts: tier=%s", spec.TierConfig.Tier)
 		tierSpec := &tier.TierSpec{
