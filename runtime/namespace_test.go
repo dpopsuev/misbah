@@ -1,6 +1,9 @@
 package runtime
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
 	"testing"
 
@@ -123,6 +126,34 @@ func TestNamespaceManagerBuildMountScript(t *testing.T) {
 	// Check tmpfs mount
 	assert.Contains(t, script, "mkdir -p \"/container/workspace/tmp\"")
 	assert.Contains(t, script, "mount -t tmpfs")
+}
+
+func TestBuildMountScript_DaemonSocket(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	// Create a fake socket file
+	socketPath := filepath.Join(t.TempDir(), "daemon.sock")
+	require.NoError(t, os.WriteFile(socketPath, []byte{}, 0644))
+
+	t.Setenv("MISBAH_DAEMON_SOCKET", socketPath)
+
+	script := nm.buildMountScript(nil)
+
+	assert.Contains(t, script, fmt.Sprintf("touch \"%s\"", socketPath))
+	assert.Contains(t, script, fmt.Sprintf("mount --bind \"%s\" \"%s\"", socketPath, socketPath))
+}
+
+func TestBuildMountScript_NoDaemonSocket(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	t.Setenv("MISBAH_DAEMON_SOCKET", "/nonexistent/path/daemon.sock")
+
+	script := nm.buildMountScript(nil)
+
+	assert.NotContains(t, script, "mount --bind")
+	assert.NotContains(t, script, "daemon.sock")
 }
 
 func TestNamespaceManagerBuildBindMount(t *testing.T) {

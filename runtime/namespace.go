@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 
+	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
 )
@@ -149,6 +151,16 @@ func (nm *NamespaceManager) buildMountScript(mounts []model.MountSpec) string {
 		default:
 			nm.logger.Warnf("Unknown mount type: %s", mount.Type)
 		}
+	}
+
+	// Mount daemon socket if it exists on the host
+	socketPath := config.GetDaemonSocket()
+	if _, err := os.Stat(socketPath); err == nil {
+		socketDir := filepath.Dir(socketPath)
+		fmt.Fprintf(&script, "mkdir -p \"%s\"\n", socketDir)
+		fmt.Fprintf(&script, "touch \"%s\"\n", socketPath)
+		fmt.Fprintf(&script, "mount --bind \"%s\" \"%s\"\n", socketPath, socketPath)
+		nm.logger.Debugf("Daemon socket mount added: %s", socketPath)
 	}
 
 	return script.String()
