@@ -103,7 +103,7 @@ func (lc *Lifecycle) Start(spec *model.ContainerSpec) error {
 		}
 		// Extract repo paths from existing bind mounts
 		for _, m := range spec.Mounts {
-			if m.Type == "bind" && m.Source != "" {
+			if m.Type == model.MountTypeBind && m.Source != "" {
 				tierSpec.Repos = append(tierSpec.Repos, m.Source)
 			}
 		}

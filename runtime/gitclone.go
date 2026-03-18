@@ -36,7 +36,7 @@ func (g *GitCloneManager) ResolveGitCloneMounts(mounts []model.MountSpec) ([]mod
 	result := make([]model.MountSpec, 0, len(mounts))
 
 	for _, m := range mounts {
-		if m.Type != "git-clone" {
+		if m.Type != model.MountTypeGitClone {
 			result = append(result, m)
 			continue
 		}
@@ -50,7 +50,7 @@ func (g *GitCloneManager) ResolveGitCloneMounts(mounts []model.MountSpec) ([]mod
 
 		// Rewrite as bind mount
 		result = append(result, model.MountSpec{
-			Type:        "bind",
+			Type:        model.MountTypeBind,
 			Source:      cloneDir,
 			Destination: m.Destination,
 			Options:     m.Options,
@@ -103,7 +103,7 @@ func (g *GitCloneManager) cloneRepo(spec *model.GitCloneSpec) (string, error) {
 	cmd := exec.Command("git", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		os.RemoveAll(cloneDir)
+		os.RemoveAll(cloneDir) // best-effort: clean up partial clone on failure
 		return "", fmt.Errorf("git clone failed: %w\noutput: %s", err, string(output))
 	}
 

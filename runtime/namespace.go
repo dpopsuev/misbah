@@ -140,11 +140,11 @@ func (nm *NamespaceManager) buildMountScript(mounts []model.MountSpec) string {
 
 	for _, mount := range mounts {
 		switch mount.Type {
-		case "bind":
+		case model.MountTypeBind:
 			script.WriteString(nm.buildBindMount(mount))
-		case "tmpfs":
+		case model.MountTypeTmpfs:
 			script.WriteString(nm.buildTmpfsMount(mount))
-		case "proc":
+		case model.MountTypeProc:
 			script.WriteString(nm.buildProcMount(mount))
 		default:
 			nm.logger.Warnf("Unknown mount type: %s", mount.Type)

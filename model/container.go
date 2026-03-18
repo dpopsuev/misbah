@@ -8,6 +8,14 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Mount type constants.
+const (
+	MountTypeBind     = "bind"
+	MountTypeTmpfs    = "tmpfs"
+	MountTypeProc     = "proc"
+	MountTypeGitClone = "git-clone"
+)
+
 // ContainerSpec represents a container specification conforming to MSB-SPC-2026-001.
 type ContainerSpec struct {
 	Version    string            `yaml:"version"`
@@ -334,9 +342,9 @@ func (n *NamespaceSpec) Validate() error {
 func (m *MountSpec) Validate() error {
 	// Validate type
 	switch m.Type {
-	case "bind", "tmpfs", "proc":
+	case MountTypeBind, MountTypeTmpfs, MountTypeProc:
 		// Valid types
-	case "git-clone":
+	case MountTypeGitClone:
 		// git-clone requires GitClone spec, source is auto-generated
 		if m.GitClone == nil {
 			return fmt.Errorf("git-clone mount requires git_clone specification")
@@ -361,7 +369,7 @@ func (m *MountSpec) Validate() error {
 	}
 
 	// Validate source for bind mounts
-	if m.Type == "bind" && m.Source == "" {
+	if m.Type == MountTypeBind && m.Source == "" {
 		return fmt.Errorf("bind mount requires source")
 	}
 
@@ -372,7 +380,7 @@ func (m *MountSpec) Validate() error {
 		"nosuid": true,
 		"nodev":  true,
 		"noexec": true,
-		"bind":   true,
+		MountTypeBind: true,
 		"rbind":  true,
 	}
 

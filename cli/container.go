@@ -235,7 +235,7 @@ func runContainerCreate(cmd *cobra.Command, args []string) error {
 		},
 		Mounts: []model.MountSpec{
 			{
-				Type:        "bind",
+				Type:        model.MountTypeBind,
 				Source:      "/tmp",
 				Destination: "/container/workspace",
 				Options:     []string{"rw"},

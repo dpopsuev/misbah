@@ -73,7 +73,7 @@ func (b *Backend) Start(spec *model.ContainerSpec) (string, error) {
 	containerConfig := BuildContainerConfig(spec)
 	containerID, err := b.client.CreateContainer(ctx, sandboxID, containerConfig, sandboxConfig)
 	if err != nil {
-		_ = b.cleanupSandbox(ctx, sandboxID)
+		_ = b.cleanupSandbox(ctx, sandboxID) // best-effort cleanup on error path
 		return "", fmt.Errorf("create container: %w", err)
 	}
 
@@ -83,7 +83,7 @@ func (b *Backend) Start(spec *model.ContainerSpec) (string, error) {
 
 	// 4. Start container
 	if err := b.client.StartContainer(ctx, containerID); err != nil {
-		_ = b.cleanupContainer(ctx, containerID, sandboxID)
+		_ = b.cleanupContainer(ctx, containerID, sandboxID) // best-effort cleanup on error path
 		return "", fmt.Errorf("start container: %w", err)
 	}
 
@@ -195,12 +195,12 @@ func (b *Backend) Close() error {
 }
 
 func (b *Backend) cleanupContainer(ctx context.Context, containerID, sandboxID string) error {
-	_ = b.client.RemoveContainer(ctx, containerID)
+	_ = b.client.RemoveContainer(ctx, containerID) // best-effort: container may not exist yet
 	return b.cleanupSandbox(ctx, sandboxID)
 }
 
 func (b *Backend) cleanupSandbox(ctx context.Context, sandboxID string) error {
-	_ = b.client.StopPodSandbox(ctx, sandboxID)
+	_ = b.client.StopPodSandbox(ctx, sandboxID) // best-effort: sandbox may already be stopped
 	return b.client.RemovePodSandbox(ctx, sandboxID)
 }
 

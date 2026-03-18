@@ -14,6 +14,14 @@ import (
 // ContainerDaemonSocketPath is the well-known path inside the container for the daemon socket.
 const ContainerDaemonSocketPath = "/run/misbah/permission.sock"
 
+// Mount option constants.
+const (
+	MountOptReadOnly = "ro"
+	MountOptNoSuid   = "nosuid"
+	MountOptNoDev    = "nodev"
+	MountOptNoExec   = "noexec"
+)
+
 // MountsToContainerMounts converts model MountSpecs to CRI Mount format.
 func MountsToContainerMounts(mounts []model.MountSpec) []*runtimeapi.Mount {
 	var result []*runtimeapi.Mount
@@ -26,9 +34,9 @@ func MountsToContainerMounts(mounts []model.MountSpec) []*runtimeapi.Mount {
 
 		for _, opt := range m.Options {
 			switch opt {
-			case "ro":
+			case MountOptReadOnly:
 				criMount.Readonly = true
-			case "nosuid", "nodev", "noexec":
+			case MountOptNoSuid, MountOptNoDev, MountOptNoExec:
 				criMount.Propagation = runtimeapi.MountPropagation_PROPAGATION_PRIVATE
 			}
 		}

@@ -25,7 +25,7 @@ func GenerateTierMounts(spec *TierSpec) ([]model.MountSpec, error) {
 		dest := filepath.Join(workspace, base)
 
 		roMounts = append(roMounts, model.MountSpec{
-			Type:        "bind",
+			Type:        model.MountTypeBind,
 			Source:      repo,
 			Destination: dest,
 			Options:     []string{"ro", "rbind"},
@@ -40,7 +40,7 @@ func GenerateTierMounts(spec *TierSpec) ([]model.MountSpec, error) {
 		}
 
 		rwMounts = append(rwMounts, model.MountSpec{
-			Type:        "bind",
+			Type:        model.MountTypeBind,
 			Source:      source,
 			Destination: dest,
 			Options:     []string{"rw", "rbind"},
