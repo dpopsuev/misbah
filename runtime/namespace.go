@@ -11,6 +11,7 @@ import (
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/proxy"
 )
 
 // // NamespaceManager manages Linux namespaces for containers.
@@ -242,12 +243,56 @@ func (nm *NamespaceManager) buildShellCommand(spec *model.ContainerSpec, mountSc
 	}
 	cmdStr := strings.Join(quoted, " ")
 
+	// Build proxy startup script if daemon socket is available
+	proxyScript := nm.buildProxyScript(spec)
+
 	return fmt.Sprintf(`
 		set -e
 		%s
+		%s
 		cd "%s"
 		exec %s
-	`, mountScript, spec.Process.Cwd, cmdStr)
+	`, mountScript, proxyScript, spec.Process.Cwd, cmdStr)
+}
+
+// buildProxyScript generates shell commands to start the network proxy in background.
+// Returns empty string if the daemon socket is not available.
+func (nm *NamespaceManager) buildProxyScript(spec *model.ContainerSpec) string {
+	socketPath := config.GetDaemonSocket()
+	if _, err := os.Stat(socketPath); err != nil {
+		return ""
+	}
+
+	// Look for misbah-proxy binary next to the misbah binary, or in PATH
+	proxyBin, err := exec.LookPath("misbah-proxy")
+	if err != nil {
+		// Try same directory as current executable
+		if self, err := os.Executable(); err == nil {
+			candidate := filepath.Join(filepath.Dir(self), "misbah-proxy")
+			if _, err := os.Stat(candidate); err == nil {
+				proxyBin = candidate
+			}
+		}
+	}
+	if proxyBin == "" {
+		nm.logger.Warnf("misbah-proxy binary not found, skipping proxy startup")
+		return ""
+	}
+
+	containerName := spec.Metadata.Name
+	listenAddr := fmt.Sprintf("127.0.0.1:%d", proxy.DefaultProxyPort)
+
+	return fmt.Sprintf(`
+		# Start network proxy in background
+		%s --socket %s --container %s --listen %s &
+		export HTTP_PROXY=http://%s
+		export HTTPS_PROXY=http://%s
+		export http_proxy=http://%s
+		export https_proxy=http://%s
+		export NO_PROXY=localhost,127.0.0.1
+		export no_proxy=localhost,127.0.0.1
+	`, shellQuote(proxyBin), shellQuote(socketPath), shellQuote(containerName), shellQuote(listenAddr),
+		listenAddr, listenAddr, listenAddr, listenAddr)
 }
 
 // CheckNamespaceSupport checks if unprivileged user namespaces are supported.

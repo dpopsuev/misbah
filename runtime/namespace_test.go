@@ -297,6 +297,48 @@ func TestShellQuote(t *testing.T) {
 	}
 }
 
+func TestBuildProxyScript_DaemonAvailable(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	// Create fake daemon socket
+	socketPath := filepath.Join(t.TempDir(), "daemon.sock")
+	require.NoError(t, os.WriteFile(socketPath, []byte{}, 0644))
+	t.Setenv("MISBAH_DAEMON_SOCKET", socketPath)
+
+	// Create fake misbah-proxy binary
+	proxyBin := filepath.Join(t.TempDir(), "misbah-proxy")
+	require.NoError(t, os.WriteFile(proxyBin, []byte("#!/bin/sh\n"), 0755))
+	// Add to PATH
+	t.Setenv("PATH", filepath.Dir(proxyBin)+":"+os.Getenv("PATH"))
+
+	spec := &model.ContainerSpec{
+		Metadata: model.ContainerMetadata{Name: "test-container"},
+	}
+
+	script := nm.buildProxyScript(spec)
+
+	assert.Contains(t, script, "misbah-proxy")
+	assert.Contains(t, script, "HTTP_PROXY=http://127.0.0.1:8118")
+	assert.Contains(t, script, "HTTPS_PROXY=http://127.0.0.1:8118")
+	assert.Contains(t, script, "NO_PROXY=localhost,127.0.0.1")
+	assert.Contains(t, script, "test-container")
+}
+
+func TestBuildProxyScript_NoDaemon(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	t.Setenv("MISBAH_DAEMON_SOCKET", "/nonexistent/daemon.sock")
+
+	spec := &model.ContainerSpec{
+		Metadata: model.ContainerMetadata{Name: "test-container"},
+	}
+
+	script := nm.buildProxyScript(spec)
+	assert.Empty(t, script)
+}
+
 func TestNamespaceManagerCreateContainer_InvalidSpec(t *testing.T) {
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
 	nm := NewNamespaceManager(logger)
