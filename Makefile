@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-integration test-e2e test-e2e-claude install clean lint fmt vet coverage help
+.PHONY: build test test-unit test-integration test-e2e test-e2e-claude install install-system uninstall-system clean lint fmt vet coverage help
 
 # Build variables
 BINARY_NAME=misbah
@@ -22,6 +22,31 @@ install:
 	@echo "Installing $(BINARY_NAME)..."
 	$(GO) install $(LDFLAGS) ./cmd/misbah
 	$(GO) install $(LDFLAGS) ./cmd/misbah-proxy
+
+## install-system: Install binaries, systemd unit, and default config (run as root)
+install-system: build
+	@echo "Installing system-wide..."
+	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)
+	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME)-proxy /usr/local/bin/$(BINARY_NAME)-proxy
+	install -Dm644 assets/misbah-daemon.service /etc/systemd/system/misbah-daemon.service
+	install -dm755 /etc/misbah
+	@test -f /etc/misbah/daemon.yaml || install -Dm644 assets/daemon.yaml /etc/misbah/daemon.yaml
+	@getent group misbah >/dev/null 2>&1 || groupadd misbah
+	@echo "Adding $(SUDO_USER) to misbah group..." && usermod -aG misbah $(SUDO_USER) 2>/dev/null || true
+	systemctl daemon-reload
+	@echo ""
+	@echo "Installed. To start: sudo systemctl start misbah-daemon"
+	@echo "Re-login or use 'sg misbah' to activate group membership."
+
+## uninstall-system: Remove binaries, systemd unit (run as root)
+uninstall-system:
+	@echo "Uninstalling..."
+	systemctl stop misbah-daemon 2>/dev/null || true
+	systemctl disable misbah-daemon 2>/dev/null || true
+	rm -f /usr/local/bin/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)-proxy
+	rm -f /etc/systemd/system/misbah-daemon.service
+	systemctl daemon-reload
+	@echo "Uninstalled. Config at /etc/misbah/ preserved."
 
 ## setup-kata: Configure host for Kata backend (run as root)
 setup-kata: build

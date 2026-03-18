@@ -1,0 +1,21 @@
+# Misbah Daemon Configuration
+# Loaded on startup. Env vars override all fields.
+# See: MISBAH_DAEMON_SOCKET, MISBAH_CRI_ENDPOINT, MISBAH_RUNTIME_HANDLER
+
+daemon:
+  socket: /run/misbah/permission.sock
+  group: misbah
+  log_level: info
+  non_interactive: false
+
+kata:
+  endpoint: unix:///run/containerd/containerd.sock
+  handler: kata
+  # Injected as per-pod CRI annotations — no global Kata config editing
+  annotations:
+    io.katacontainers.config.runtime.internetworking_model: "none"
+    io.katacontainers.config.runtime.disable_new_netns: "true"
+
+permissions:
+  whitelist: /var/lib/misbah/whitelist.yaml
+  audit_log: /var/lib/misbah/audit.log
