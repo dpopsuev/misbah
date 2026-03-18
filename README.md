@@ -1,81 +1,172 @@
 # Misbah
 
-A workspace manager for CLI AI agents that enables multi-repository development through Linux user namespaces and bind mounts.
+A container manager for CLI AI agents that creates isolated execution environments with progressive trust permission brokering.
 
-## Overview
+## What It Does
 
-CLI AI agents (Claude Code, Aider, Cursor) are currently bound to a single working directory. Misbah solves this by creating unified workspaces from multiple source repositories using Linux namespaces, allowing agents to seamlessly work across project boundaries.
+Misbah runs AI agents (Claude Code, Aider, etc.) inside isolated containers. All outbound network access, MCP tool calls, and package installations are blocked by default. When the agent needs access, the user is prompted with **[Once] / [Always] / [Deny]**.
 
-## Features
+```
+Agent: curl api.github.com
+  |
+  v
+Network Proxy (inside container)
+  |
+  v
+Permission Daemon (on host)
+  |
+  v
+User: [O]nce  [A]lways  [D]eny: _
+```
 
-- **Multi-repository workspaces**: Mount multiple source directories into a unified namespace
-- **Zero-privilege isolation**: Uses unprivileged user namespaces (no root required)
-- **Provider integration**: Native support for Claude Code, Aider, and Cursor
-- **MCP Server**: Model Context Protocol server for AI agent integration
-- **Closure semantics**: Hierarchical namespace restrictions for child agents
-- **Lock management**: Prevents concurrent access conflicts
+## Architecture
 
-## Requirements
+Two backends, one security model:
 
-- Linux kernel 3.8+ with unprivileged user namespaces enabled
-- Go 1.22+ (for building from source)
-- util-linux (mount command)
-- Provider binaries in PATH (claude, aider, etc.)
+- **Namespace backend** (local dev): Daemonless, rootless. Uses Linux user namespaces and bind mounts. Works out of the box.
+- **Kata backend** (VM isolation): Runs agents in hardware-isolated Kata VMs via a privileged daemon. Requires containerd + Kata Containers.
+
+```
+User (unprivileged)
+  |
+  +-- misbah container start --spec agent.yaml          (namespace: direct)
+  +-- misbah container start --spec agent.yaml --runtime kata  (kata: via daemon)
+        |
+        v
+  Misbah Daemon (privileged, systemd)
+    +-- containerd/CRI --> Kata VM (QEMU/KVM)
+    +-- Permission broker --> user prompts
+    +-- Audit log
+```
 
 ## Quick Start
 
-### CLI Usage
+### Build
 
 ```bash
-# Install
-make install
-
-# Create a workspace manifest
-misbah create -w myworkspace
-
-# Edit the manifest to add sources
-misbah edit -w myworkspace
-
-# Mount and launch Claude Code
-misbah mount -w myworkspace -a claude
-
-# List workspaces
-misbah peaks
-
-# Current workspace status
-misbah summit
+make build
+# Produces bin/misbah and bin/misbah-proxy
 ```
 
-### MCP Server Usage
+### Namespace Container (no setup required)
 
 ```bash
-# Start MCP server
-misbah serve --port 8080
+# Create a container spec
+bin/misbah container create --spec agent.yaml --name my-agent
 
-# MCP server provides these tools for AI agents:
-# - misbah_list_workspaces
-# - misbah_create_workspace
-# - misbah_get_workspace
-# - misbah_update_manifest
-# - misbah_validate_workspace
-# - misbah_get_status
-# - misbah_list_providers
+# Run it
+bin/misbah container start --spec agent.yaml
 
-# Test MCP server
-curl -X POST http://localhost:8080 \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+# With permission daemon (enables progressive trust)
+bin/misbah daemon start &
+bin/misbah container start --spec agent.yaml
+# Agent traffic now routed through proxy -> daemon -> user prompt
 ```
 
-## Documentation
+### Kata Container (requires infrastructure)
 
-- [Installation Guide](docs/INSTALL.md)
-- [Architecture](docs/ARCHITECTURE.md)
-- [Examples](docs/EXAMPLES.md)
+```bash
+# Install: containerd, kata-containers, CNI plugins
+# See docs/INSTALL.md
 
-## Project Status
+# Install and start daemon
+sudo cp bin/misbah bin/misbah-proxy /usr/local/bin/
+sudo cp assets/misbah-daemon.service /etc/systemd/system/
+sudo groupadd misbah && sudo usermod -aG misbah $USER
+sudo systemctl enable --now misbah-daemon
 
-🚧 **v0.1.0 MVP in development** - First E2E test in progress
+# Run (as unprivileged user in misbah group)
+bin/misbah container start --spec agent.yaml --runtime kata
+```
+
+### Container Spec Example
+
+```yaml
+version: "1.0"
+metadata:
+  name: coding-agent
+process:
+  command: ["/bin/bash"]
+  cwd: /workspace
+namespaces:
+  user: true
+  mount: true
+  pid: true
+mounts:
+  - type: bind
+    source: /home/user/project
+    destination: /workspace
+    options: [rw]
+permissions:
+  default_policy: prompt
+  network_whitelist:
+    - api.github.com
+  mcp_whitelist:
+    - scribe_list
+```
+
+## Progressive Trust
+
+Every resource access goes through the permission daemon:
+
+| Resource | Proxy | Example |
+|----------|-------|---------|
+| Network | HTTP/HTTPS forward proxy | `curl api.github.com` |
+| MCP tools | JSON-RPC reverse proxy | `scribe artifact create` |
+| Packages | CLI wrapper | `pip install numpy` |
+
+Decisions persist: **Always** is saved to whitelist, **Once** is ephemeral, **Deny** blocks permanently.
+
+## Security Model
+
+```
+Host:
+  Daemon (root:containerd) --> containerd socket
+  Socket (/run/misbah/permission.sock, root:misbah 660)
+
+Container:
+  Agent --> proxy --> permission.sock --> daemon --> user
+  Cannot: access containerd, host filesystem, daemon API socket
+```
+
+- Namespace backend: unprivileged user namespaces (no root)
+- Kata backend: separate kernel per agent (QEMU/KVM)
+- Daemon socket: `root:misbah 660` (Docker model)
+- Zero-trust: deny-by-default, explicit user approval
+
+## Project Structure
+
+```
+cmd/misbah/          Entry point
+cmd/misbah-proxy/    Network proxy binary (runs inside containers)
+cli/                 Cobra CLI commands
+daemon/              Permission daemon + container lifecycle server
+proxy/               Network, MCP, and package proxies
+cri/                 CRI client for containerd/Kata
+runtime/             Namespace backend, lifecycle, locks, cgroups
+model/               Container spec, lock model
+config/              Configuration and path defaults
+tier/                Tier namespace mount generation (Eco/Sys/Com/Mod)
+mcp/                 MCP protocol server
+metrics/             Structured logging
+test/harness/        E2E test harness (Lab isolation, probes)
+test/e2e/            End-to-end tests
+test/integration/    Integration tests
+assets/              Systemd unit file
+```
+
+## Requirements
+
+- Linux kernel 5.10+ with unprivileged user namespaces
+- Go 1.23+ (building from source)
+- For Kata: containerd, kata-containers, KVM (`/dev/kvm`), CNI plugins
+
+## Status
+
+**Namespace backend**: Operational. Containers run with full isolation, progressive trust wired end-to-end.
+
+**Kata backend**: Code complete. Blocked by upstream Kata networking issue on Fedora 43 / kernel 6.18 (MSB-MIR-4).
 
 ## License
 
-MIT License - See LICENSE file for details
+MIT
