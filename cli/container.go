@@ -549,7 +549,7 @@ func runContainerDestroy(cmd *cobra.Command, args []string) error {
 	}
 
 	// Remove lock file (if exists)
-	lockPath := filepath.Join("/tmp/misbah/.locks", containerName+".lock")
+	lockPath := filepath.Join(config.GetLocksDir(), containerName+".lock")
 	if err := os.Remove(lockPath); err != nil && !os.IsNotExist(err) {
 		logger.Warnf("Failed to remove lock file: %v", err)
 	}

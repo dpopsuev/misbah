@@ -32,23 +32,20 @@ func (ch *CleanupHandler) RegisterCleanup(cleanup func() error) {
 }
 
 // SetupSignalHandlers sets up signal handlers for graceful shutdown.
-func (ch *CleanupHandler) SetupSignalHandlers() {
+// Returns a channel that receives the signal. The caller owns the exit decision.
+func (ch *CleanupHandler) SetupSignalHandlers() <-chan os.Signal {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM, syscall.SIGINT)
 
+	done := make(chan os.Signal, 1)
 	go func() {
 		sig := <-sigChan
 		ch.logger.Infof("Received signal %s, cleaning up...", sig)
-
-		// Run all cleanup functions
-		for i, cleanup := range ch.cleanups {
-			if err := cleanup(); err != nil {
-				ch.logger.Errorf("Cleanup function %d failed: %v", i, err)
-			}
-		}
-
-		os.Exit(0)
+		ch.RunCleanup()
+		done <- sig
 	}()
+
+	return done
 }
 
 // RunCleanup runs all registered cleanup functions.
