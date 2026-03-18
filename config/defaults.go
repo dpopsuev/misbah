@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strconv"
 )
 
 const (
@@ -42,6 +43,12 @@ const (
 	DefaultDaemonSocket  = "/run/misbah/permission.sock"
 	DefaultAuditLogPath  = "audit.log"
 	DefaultWhitelistPath = "whitelist.yaml"
+)
+
+// Network proxy defaults.
+const (
+	DefaultProxyPort = 8118
+	EnvProxyPort     = "MISBAH_PROXY_PORT"
 )
 
 // Environment variable names.
@@ -163,4 +170,14 @@ func GetAuditLogPath() string {
 // GetWhitelistPath returns the whitelist file path (relative to config dir).
 func GetWhitelistPath() string {
 	return filepath.Join(GetConfigDir(), DefaultWhitelistPath)
+}
+
+// GetProxyPort returns the proxy port, checking env override first.
+func GetProxyPort() int {
+	if port := os.Getenv(EnvProxyPort); port != "" {
+		if p, err := strconv.Atoi(port); err == nil {
+			return p
+		}
+	}
+	return DefaultProxyPort
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/proxy"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -163,6 +164,11 @@ func BuildContainerConfig(spec *model.ContainerSpec) *runtimeapi.ContainerConfig
 			ContainerPath: ContainerDaemonSocketPath,
 			HostPath:      socketPath,
 		})
+
+		// Inject proxy environment variables so agent traffic routes through the network proxy
+		proxyAddr := fmt.Sprintf("127.0.0.1:%d", proxy.DefaultProxyPort)
+		proxyEnvs := proxy.ProxyEnvVars(proxyAddr, ContainerDaemonSocketPath)
+		config.Envs = append(config.Envs, EnvToKeyValues(proxyEnvs)...)
 	}
 
 	return config
