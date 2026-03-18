@@ -5,20 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 
-	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/runtime"
-	"github.com/dpopsuev/misbah/provider"
-	"github.com/dpopsuev/misbah/validate"
 )
 
 // Server implements the MCP (Model Context Protocol) server for misbah.
 type Server struct {
-	logger    *metrics.Logger
-	recorder  *metrics.MetricsRecorder
-	lifecycle *runtime.Lifecycle
+	logger   *metrics.Logger
+	recorder *metrics.MetricsRecorder
 }
 
 // NewServer creates a new MCP server.
@@ -31,9 +28,8 @@ func NewServer(logger *metrics.Logger, recorder *metrics.MetricsRecorder) *Serve
 	}
 
 	return &Server{
-		logger:    logger,
-		recorder:  recorder,
-		lifecycle: runtime.NewLifecycle(logger, recorder),
+		logger:   logger,
+		recorder: recorder,
 	}
 }
 
@@ -52,7 +48,6 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Route to appropriate handler
 	var result interface{}
 	var err error
 
@@ -119,7 +114,6 @@ type ErrorDetail struct {
 	Message string `json:"message"`
 }
 
-// Initialize response
 type InitializeResult struct {
 	ProtocolVersion string       `json:"protocolVersion"`
 	Capabilities    Capabilities `json:"capabilities"`
@@ -149,7 +143,7 @@ func (s *Server) handleInitialize(ctx context.Context, params json.RawMessage) (
 		},
 		ServerInfo: ServerInfo{
 			Name:    "misbah",
-			Version: "0.1.0",
+			Version: "0.2.0",
 		},
 	}, nil
 }
@@ -157,71 +151,40 @@ func (s *Server) handleInitialize(ctx context.Context, params json.RawMessage) (
 func (s *Server) handleListTools(ctx context.Context) (interface{}, error) {
 	tools := []Tool{
 		{
-			Name:        "misbah_list_workspaces",
-			Description: "List all available workspaces",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
-		},
-		{
-			Name:        "misbah_create_workspace",
-			Description: "Create a new workspace",
+			Name:        "misbah_container_create",
+			Description: "Create a new container specification file",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
 				"properties":{
-					"name":{"type":"string","description":"Workspace name"},
-					"description":{"type":"string","description":"Optional description"}
+					"spec_path":{"type":"string","description":"Path for the new spec YAML file"},
+					"name":{"type":"string","description":"Container name"},
+					"command":{"type":"array","items":{"type":"string"},"description":"Command to run (default: /bin/bash)"},
+					"image":{"type":"string","description":"OCI image (optional)"}
 				},
-				"required":["name"]
+				"required":["spec_path","name"]
 			}`),
 		},
 		{
-			Name:        "misbah_get_workspace",
-			Description: "Get workspace details including manifest",
+			Name:        "misbah_container_validate",
+			Description: "Validate a container specification file",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
 				"properties":{
-					"name":{"type":"string","description":"Workspace name"}
+					"spec_path":{"type":"string","description":"Path to the container spec YAML"}
 				},
-				"required":["name"]
+				"required":["spec_path"]
 			}`),
 		},
 		{
-			Name:        "misbah_update_manifest",
-			Description: "Update workspace manifest",
+			Name:        "misbah_container_inspect",
+			Description: "Load and display a container specification",
 			InputSchema: json.RawMessage(`{
 				"type":"object",
 				"properties":{
-					"name":{"type":"string","description":"Workspace name"},
-					"manifest":{"type":"object","description":"Manifest YAML as object"}
+					"spec_path":{"type":"string","description":"Path to the container spec YAML"}
 				},
-				"required":["name","manifest"]
+				"required":["spec_path"]
 			}`),
-		},
-		{
-			Name:        "misbah_validate_workspace",
-			Description: "Validate a workspace manifest",
-			InputSchema: json.RawMessage(`{
-				"type":"object",
-				"properties":{
-					"name":{"type":"string","description":"Workspace name"}
-				},
-				"required":["name"]
-			}`),
-		},
-		{
-			Name:        "misbah_get_status",
-			Description: "Get workspace mount status",
-			InputSchema: json.RawMessage(`{
-				"type":"object",
-				"properties":{
-					"name":{"type":"string","description":"Workspace name"}
-				},
-				"required":["name"]
-			}`),
-		},
-		{
-			Name:        "misbah_list_providers",
-			Description: "List available providers (claude, aider, cursor)",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{}}`),
 		},
 	}
 
@@ -245,20 +208,12 @@ func (s *Server) handleCallTool(ctx context.Context, params json.RawMessage) (in
 	s.logger.Debugf("MCP tool call: %s", call.Name)
 
 	switch call.Name {
-	case "misbah_list_workspaces":
-		return s.toolListWorkspaces(ctx, call.Arguments)
-	case "misbah_create_workspace":
-		return s.toolCreateWorkspace(ctx, call.Arguments)
-	case "misbah_get_workspace":
-		return s.toolGetWorkspace(ctx, call.Arguments)
-	case "misbah_update_manifest":
-		return s.toolUpdateManifest(ctx, call.Arguments)
-	case "misbah_validate_workspace":
-		return s.toolValidateWorkspace(ctx, call.Arguments)
-	case "misbah_get_status":
-		return s.toolGetStatus(ctx, call.Arguments)
-	case "misbah_list_providers":
-		return s.toolListProviders(ctx, call.Arguments)
+	case "misbah_container_create":
+		return s.toolContainerCreate(ctx, call.Arguments)
+	case "misbah_container_validate":
+		return s.toolContainerValidate(ctx, call.Arguments)
+	case "misbah_container_inspect":
+		return s.toolContainerInspect(ctx, call.Arguments)
 	default:
 		return nil, fmt.Errorf("unknown tool: %s", call.Name)
 	}
@@ -279,200 +234,103 @@ type ContentItem struct {
 	Text string `json:"text"`
 }
 
-func (s *Server) toolListWorkspaces(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	workspaces, err := config.ListWorkspaces()
-	if err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to list workspaces: %v", err)), nil
+func (s *Server) toolContainerCreate(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	specPath, ok := args["spec_path"].(string)
+	if !ok {
+		return s.errorResult("spec_path is required"), nil
+	}
+	name, ok := args["name"].(string)
+	if !ok {
+		return s.errorResult("name is required"), nil
 	}
 
-	// Load details for each workspace
-	var workspaceDetails []map[string]interface{}
-	for _, name := range workspaces {
-		manifestPath := config.GetManifestPath(name)
-		manifest, err := model.LoadManifest(manifestPath)
-		if err != nil {
-			s.logger.Warnf("Failed to load manifest for %s: %v", name, err)
-			continue
+	command := []string{"/bin/bash"}
+	if cmdArg, ok := args["command"].([]interface{}); ok {
+		command = make([]string, 0, len(cmdArg))
+		for _, c := range cmdArg {
+			if str, ok := c.(string); ok {
+				command = append(command, str)
+			}
 		}
-
-		workspaceDetails = append(workspaceDetails, map[string]interface{}{
-			"name":        manifest.Name,
-			"description": manifest.Description,
-			"sources":     len(manifest.Sources),
-			"tags":        manifest.Tags,
-		})
 	}
 
-	result, _ := json.MarshalIndent(map[string]interface{}{
-		"workspaces": workspaceDetails,
-		"total":      len(workspaceDetails),
-	}, "", "  ")
+	image, _ := args["image"].(string)
 
-	return ToolResult{
-		Content: []ContentItem{{Type: "text", Text: string(result)}},
-	}, nil
-}
-
-func (s *Server) toolCreateWorkspace(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	name, ok := args["name"].(string)
-	if !ok {
-		return s.errorResult("name is required"), nil
+	spec := &model.ContainerSpec{
+		Version: "1.0",
+		Metadata: model.ContainerMetadata{
+			Name: name,
+		},
+		Image: image,
+		Process: model.ProcessSpec{
+			Command: command,
+			Cwd:     "/container/workspace",
+		},
+		Namespaces: model.NamespaceSpec{
+			User:  true,
+			Mount: true,
+			PID:   true,
+		},
 	}
 
-	description, _ := args["description"].(string)
-
-	// Validate name
-	if err := model.ValidateWorkspaceName(name); err != nil {
-		return s.errorResult(fmt.Sprintf("Invalid workspace name: %v", err)), nil
+	if err := spec.Validate(); err != nil {
+		return s.errorResult(fmt.Sprintf("Invalid spec: %v", err)), nil
 	}
 
-	// Check if exists
-	if config.WorkspaceExists(name) {
-		return s.errorResult(fmt.Sprintf("Workspace '%s' already exists", name)), nil
+	dir := filepath.Dir(specPath)
+	if dir != "" && dir != "." {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return s.errorResult(fmt.Sprintf("Failed to create directory: %v", err)), nil
+		}
 	}
 
-	// Create directory
-	if err := config.EnsureWorkspaceDir(name); err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to create workspace directory: %v", err)), nil
-	}
-
-	// Create manifest
-	manifest := &model.Manifest{
-		Name:        name,
-		Description: description,
-		Sources:     []model.SourceSpec{},
-		Providers:   make(map[string]interface{}),
-		Tags:        []string{},
-	}
-
-	manifestPath := config.GetManifestPath(name)
-	if err := manifest.SaveManifest(manifestPath); err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to save manifest: %v", err)), nil
+	if err := spec.SaveContainerSpec(specPath); err != nil {
+		return s.errorResult(fmt.Sprintf("Failed to save spec: %v", err)), nil
 	}
 
 	return ToolResult{
 		Content: []ContentItem{{
 			Type: "text",
-			Text: fmt.Sprintf("✓ Workspace '%s' created successfully at %s", name, manifestPath),
+			Text: fmt.Sprintf("Container spec created at %s", specPath),
 		}},
 	}, nil
 }
 
-func (s *Server) toolGetWorkspace(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	name, ok := args["name"].(string)
+func (s *Server) toolContainerValidate(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	specPath, ok := args["spec_path"].(string)
 	if !ok {
-		return s.errorResult("name is required"), nil
+		return s.errorResult("spec_path is required"), nil
 	}
 
-	if !config.WorkspaceExists(name) {
-		return s.errorResult(fmt.Sprintf("Workspace '%s' does not exist", name)), nil
-	}
-
-	manifestPath := config.GetManifestPath(name)
-	manifest, err := model.LoadManifest(manifestPath)
+	spec, err := model.LoadContainerSpec(specPath)
 	if err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to load manifest: %v", err)), nil
+		return s.errorResult(fmt.Sprintf("Failed to load spec: %v", err)), nil
 	}
 
-	result, _ := json.MarshalIndent(manifest, "", "  ")
-
-	return ToolResult{
-		Content: []ContentItem{{Type: "text", Text: string(result)}},
-	}, nil
-}
-
-func (s *Server) toolUpdateManifest(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	name, ok := args["name"].(string)
-	if !ok {
-		return s.errorResult("name is required"), nil
-	}
-
-	manifestData, ok := args["manifest"].(map[string]interface{})
-	if !ok {
-		return s.errorResult("manifest is required and must be an object"), nil
-	}
-
-	// Convert map to manifest struct
-	manifestJSON, err := json.Marshal(manifestData)
-	if err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to serialize manifest: %v", err)), nil
-	}
-
-	var manifest model.Manifest
-	if err := json.Unmarshal(manifestJSON, &manifest); err != nil {
-		return s.errorResult(fmt.Sprintf("Invalid manifest structure: %v", err)), nil
-	}
-
-	// Ensure name matches
-	manifest.Name = name
-
-	// Validate
-	if err := validate.ValidateManifest(&manifest); err != nil {
-		return s.errorResult(fmt.Sprintf("Validation failed: %v", err)), nil
-	}
-
-	// Save
-	manifestPath := config.GetManifestPath(name)
-	if err := manifest.SaveManifest(manifestPath); err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to save manifest: %v", err)), nil
-	}
-
-	return ToolResult{
-		Content: []ContentItem{{
-			Type: "text",
-			Text: fmt.Sprintf("✓ Manifest updated successfully for workspace '%s'", name),
-		}},
-	}, nil
-}
-
-func (s *Server) toolValidateWorkspace(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	name, ok := args["name"].(string)
-	if !ok {
-		return s.errorResult("name is required"), nil
-	}
-
-	if !config.WorkspaceExists(name) {
-		return s.errorResult(fmt.Sprintf("Workspace '%s' does not exist", name)), nil
-	}
-
-	manifestPath := config.GetManifestPath(name)
-	if err := validate.ValidateManifestFile(manifestPath); err != nil {
+	if err := spec.Validate(); err != nil {
 		return s.errorResult(fmt.Sprintf("Validation failed: %v", err)), nil
 	}
 
 	return ToolResult{
 		Content: []ContentItem{{
 			Type: "text",
-			Text: fmt.Sprintf("✓ Workspace '%s' is valid", name),
+			Text: fmt.Sprintf("Container spec '%s' is valid", spec.Metadata.Name),
 		}},
 	}, nil
 }
 
-func (s *Server) toolGetStatus(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	name, ok := args["name"].(string)
+func (s *Server) toolContainerInspect(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	specPath, ok := args["spec_path"].(string)
 	if !ok {
-		return s.errorResult("name is required"), nil
+		return s.errorResult("spec_path is required"), nil
 	}
 
-	status, err := s.lifecycle.GetStatus(name)
+	spec, err := model.LoadContainerSpec(specPath)
 	if err != nil {
-		return s.errorResult(fmt.Sprintf("Failed to get status: %v", err)), nil
+		return s.errorResult(fmt.Sprintf("Failed to load spec: %v", err)), nil
 	}
 
-	result, _ := json.MarshalIndent(status, "", "  ")
-
-	return ToolResult{
-		Content: []ContentItem{{Type: "text", Text: string(result)}},
-	}, nil
-}
-
-func (s *Server) toolListProviders(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	providers := provider.GetProviderInfo()
-
-	result, _ := json.MarshalIndent(map[string]interface{}{
-		"providers": providers,
-		"total":     len(providers),
-	}, "", "  ")
+	result, _ := json.MarshalIndent(spec, "", "  ")
 
 	return ToolResult{
 		Content: []ContentItem{{Type: "text", Text: string(result)}},
