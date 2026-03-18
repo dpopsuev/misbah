@@ -168,10 +168,12 @@ func TestBuildContainerConfig(t *testing.T) {
 	assert.Equal(t, "docker.io/library/alpine:latest", config.Image.Image)
 	assert.Equal(t, []string{"/bin/bash", "-c", "echo hello"}, config.Command)
 	assert.Equal(t, "/workspace", config.WorkingDir)
-	require.Len(t, config.Envs, 1)
+	// At least the user-specified env var; proxy vars may be added if daemon socket exists
+	require.GreaterOrEqual(t, len(config.Envs), 1)
 	assert.Equal(t, "FOO", config.Envs[0].Key)
 	assert.Equal(t, "bar", config.Envs[0].Value)
-	require.Len(t, config.Mounts, 1)
+	// At least the user-specified mount; daemon socket mount may be added if daemon is running
+	require.GreaterOrEqual(t, len(config.Mounts), 1)
 	assert.Equal(t, "/workspace", config.Mounts[0].ContainerPath)
 	assert.Equal(t, "true", config.Labels["misbah.dev/managed"])
 	require.NotNil(t, config.Linux)

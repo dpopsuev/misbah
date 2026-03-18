@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	osuser "os/user"
 	"path/filepath"
 
 	"github.com/dpopsuev/misbah/metrics"
@@ -69,6 +70,12 @@ func (s *Server) Start(socketPath string) error {
 		return fmt.Errorf("failed to listen on socket: %w", err)
 	}
 	s.listener = ln
+
+	// Set socket permissions: root:misbah 660 (like Docker's docker.sock).
+	// Users in the 'misbah' group can connect. Others cannot.
+	if err := setSocketGroupPermissions(socketPath, "misbah", s.logger); err != nil {
+		s.logger.Warnf("Socket group setup: %v (falling back to root-only access)", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/permission/request", s.handleRequest)
@@ -188,6 +195,30 @@ func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(v)
+}
+
+// setSocketGroupPermissions sets the socket to group-readable/writable for the given group.
+func setSocketGroupPermissions(socketPath, groupName string, logger *metrics.Logger) error {
+	grp, err := osuser.LookupGroup(groupName)
+	if err != nil {
+		return fmt.Errorf("group %q not found: %w (create with: sudo groupadd %s)", groupName, err, groupName)
+	}
+
+	gid := 0
+	if _, err := fmt.Sscanf(grp.Gid, "%d", &gid); err != nil {
+		return fmt.Errorf("invalid GID for group %s: %w", groupName, err)
+	}
+
+	if err := os.Chown(socketPath, 0, gid); err != nil {
+		return fmt.Errorf("failed to chown socket to root:%s: %w", groupName, err)
+	}
+
+	if err := os.Chmod(socketPath, 0660); err != nil {
+		return fmt.Errorf("failed to chmod socket: %w", err)
+	}
+
+	logger.Infof("Socket permissions set: root:%s 660", groupName)
+	return nil
 }
 
 func (s *Server) writeError(w http.ResponseWriter, status int, message string) {

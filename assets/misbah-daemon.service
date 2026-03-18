@@ -1,0 +1,28 @@
+[Unit]
+Description=Misbah Permission and Container Daemon
+Documentation=https://github.com/dpopsuev/misbah
+After=network.target containerd.service
+Requires=containerd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/misbah daemon start --verbose
+ExecStop=/bin/kill -TERM $MAINPID
+Restart=on-failure
+RestartSec=5
+
+# Security
+User=root
+Group=root
+
+# Socket and state
+RuntimeDirectory=misbah
+StateDirectory=misbah
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=misbah-daemon
+
+[Install]
+WantedBy=multi-user.target

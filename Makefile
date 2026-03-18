@@ -10,11 +10,12 @@ LDFLAGS=-ldflags "-s -w"
 # Default target
 all: build
 
-## build: Build the misbah binary
+## build: Build all binaries
 build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/misbah
+	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-proxy ./cmd/misbah-proxy
 
 ## install: Install misbah to $GOPATH/bin
 install:
@@ -27,7 +28,7 @@ test: test-unit test-integration
 ## test-unit: Run unit tests
 test-unit:
 	@echo "Running unit tests..."
-	$(GO) test -v -race -cover ./model/... ./config/... ./validate/... ./provider/... ./mount/... ./cli/... ./mcp/... ./metrics/...
+	$(GO) test -v -race -cover ./...
 
 ## test-integration: Run integration tests (Linux only)
 test-integration:
