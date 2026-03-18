@@ -341,7 +341,7 @@ func runContainerList(cmd *cobra.Command, args []string) error {
 	logger.Infof("Listing running containers")
 
 	// List lock files
-	locksDir := "/tmp/misbah/.locks"
+	locksDir := config.GetLocksDir()
 	if _, err := os.Stat(locksDir); os.IsNotExist(err) {
 		logger.Infof("No running containers")
 		return nil

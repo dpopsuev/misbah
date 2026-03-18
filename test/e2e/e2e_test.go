@@ -10,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/dpopsuev/misbah/test/harness"
 )
 
 const (
@@ -23,19 +25,19 @@ func TestBasicWorkflow(t *testing.T) {
 		t.Skip("E2E tests require Linux")
 	}
 
-	root := repoRoot(t)
-	misbahBin := filepath.Join(root, "misbah")
-	runInDir(t, root, "go", "build", "-o", misbahBin, "./cmd/misbah")
-	defer os.Remove(misbahBin)
+	lab := harness.NewLab(t)
 
 	testDir := t.TempDir()
 	containerName := "e2e-basic-" + time.Now().Format("20060102-150405")
 	specFile := filepath.Join(testDir, "test-container.yaml")
 
 	t.Run("create_spec", func(t *testing.T) {
-		output := runOutput(t, misbahBin, "container", "create",
+		output, err := lab.RunMisbah("container", "create",
 			"--spec", specFile,
 			"--name", containerName)
+		if err != nil {
+			t.Fatalf("create failed: %v\n%s", err, output)
+		}
 		if !strings.Contains(output, "Container specification created") {
 			t.Fatalf("Unexpected output: %s", output)
 		}
@@ -45,25 +47,36 @@ func TestBasicWorkflow(t *testing.T) {
 	})
 
 	t.Run("validate_spec", func(t *testing.T) {
-		output := runOutput(t, misbahBin, "container", "validate", "--spec", specFile)
+		output, err := lab.RunMisbah("container", "validate", "--spec", specFile)
+		if err != nil {
+			t.Fatalf("validate failed: %v\n%s", err, output)
+		}
 		if !strings.Contains(output, "valid") {
 			t.Fatalf("Validation failed: %s", output)
 		}
 	})
 
 	t.Run("inspect_spec", func(t *testing.T) {
-		output := runOutput(t, misbahBin, "container", "inspect", "--spec", specFile)
+		output, err := lab.RunMisbah("container", "inspect", "--spec", specFile)
+		if err != nil {
+			t.Fatalf("inspect failed: %v\n%s", err, output)
+		}
 		if !strings.Contains(output, containerName) {
 			t.Fatalf("Inspect doesn't contain container name: %s", output)
 		}
 	})
 
 	t.Run("version", func(t *testing.T) {
-		output := runOutput(t, misbahBin, "version")
+		output, err := lab.RunMisbah("version")
+		if err != nil {
+			t.Fatalf("version failed: %v\n%s", err, output)
+		}
 		if !strings.Contains(output, "misbah version") {
 			t.Fatalf("Unexpected version output: %s", output)
 		}
 	})
+
+	harness.AssertNoStaleState(t, lab)
 }
 
 // TestContainerizedWorkflow tests misbah inside a container
