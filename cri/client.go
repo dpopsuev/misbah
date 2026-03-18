@@ -64,21 +64,19 @@ func (c *Client) PullImage(ctx context.Context, imageRef string) error {
 	return nil
 }
 
-// RunPodSandbox creates and starts a pod sandbox with the given runtime handler.
-func (c *Client) RunPodSandbox(ctx context.Context, name, runtimeHandler string) (string, error) {
-	c.logger.Infof("Creating pod sandbox: %s (handler=%s)", name, runtimeHandler)
-
-	config := BuildPodSandboxConfig(name)
+// RunPodSandbox creates and starts a pod sandbox with the given config and runtime handler.
+func (c *Client) RunPodSandbox(ctx context.Context, sandboxConfig *runtimeapi.PodSandboxConfig, runtimeHandler string) (string, error) {
+	c.logger.Infof("Creating pod sandbox: %s (handler=%s)", sandboxConfig.Metadata.Name, runtimeHandler)
 
 	resp, err := c.runtime.RunPodSandbox(ctx, &runtimeapi.RunPodSandboxRequest{
-		Config:         config,
+		Config:         sandboxConfig,
 		RuntimeHandler: runtimeHandler,
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to run pod sandbox %s: %w", name, err)
+		return "", fmt.Errorf("failed to run pod sandbox %s: %w", sandboxConfig.Metadata.Name, err)
 	}
 
-	c.logger.Infof("Pod sandbox created: %s -> %s", name, resp.PodSandboxId)
+	c.logger.Infof("Pod sandbox created: %s -> %s", sandboxConfig.Metadata.Name, resp.PodSandboxId)
 	return resp.PodSandboxId, nil
 }
 

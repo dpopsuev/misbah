@@ -80,8 +80,10 @@ func EnvToKeyValues(envs []string) []*runtimeapi.KeyValue {
 }
 
 // BuildPodSandboxConfig creates a PodSandboxConfig for a Misbah container.
-func BuildPodSandboxConfig(name string) *runtimeapi.PodSandboxConfig {
-	return &runtimeapi.PodSandboxConfig{
+// Kata annotations (from daemon config) are injected as OCI annotations
+// for per-pod runtime configuration without editing global Kata config.
+func BuildPodSandboxConfig(name string, annotations map[string]string) *runtimeapi.PodSandboxConfig {
+	config := &runtimeapi.PodSandboxConfig{
 		Metadata: &runtimeapi.PodSandboxMetadata{
 			Name:      name,
 			Namespace: "misbah",
@@ -94,6 +96,12 @@ func BuildPodSandboxConfig(name string) *runtimeapi.PodSandboxConfig {
 		},
 		Linux: &runtimeapi.LinuxPodSandboxConfig{},
 	}
+
+	if len(annotations) > 0 {
+		config.Annotations = annotations
+	}
+
+	return config
 }
 
 // ApplyNetworkConfig applies NetworkConfig to a PodSandboxConfig.

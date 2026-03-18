@@ -18,6 +18,7 @@ type Backend struct {
 	client         *Client
 	runtimeHandler string
 	logger         *metrics.Logger
+	annotations    map[string]string // Kata per-pod annotations from daemon config
 
 	mu         sync.Mutex
 	sandboxes  map[string]string // name -> sandboxID
@@ -25,7 +26,7 @@ type Backend struct {
 }
 
 // NewBackend creates a CRI-based container backend.
-func NewBackend(endpoint, runtimeHandler string, logger *metrics.Logger) (*Backend, error) {
+func NewBackend(endpoint, runtimeHandler string, logger *metrics.Logger, annotations ...map[string]string) (*Backend, error) {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
@@ -35,10 +36,16 @@ func NewBackend(endpoint, runtimeHandler string, logger *metrics.Logger) (*Backe
 		return nil, err
 	}
 
+	var ann map[string]string
+	if len(annotations) > 0 {
+		ann = annotations[0]
+	}
+
 	return &Backend{
 		client:         client,
 		runtimeHandler: runtimeHandler,
 		logger:         logger,
+		annotations:    ann,
 		sandboxes:      make(map[string]string),
 		containers:     make(map[string]string),
 	}, nil
@@ -58,9 +65,9 @@ func (b *Backend) Start(spec *model.ContainerSpec) (string, error) {
 	}
 
 	// 2. Create pod sandbox
-	sandboxConfig := BuildPodSandboxConfig(name)
+	sandboxConfig := BuildPodSandboxConfig(name, b.annotations)
 	ApplyNetworkConfig(sandboxConfig, spec.Network)
-	sandboxID, err := b.client.RunPodSandbox(ctx, name, b.runtimeHandler)
+	sandboxID, err := b.client.RunPodSandbox(ctx, sandboxConfig, b.runtimeHandler)
 	if err != nil {
 		return "", fmt.Errorf("run pod sandbox: %w", err)
 	}

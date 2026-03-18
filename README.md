@@ -69,7 +69,7 @@ bin/misbah container start --spec agent.yaml
 # Prerequisites: containerd, kata-containers, KVM, CNI plugins
 # On Fedora: sudo dnf install containerd kata-containers containernetworking-plugins
 
-# One-command setup (configures containerd, Kata, CNI, group, daemon)
+# First-time setup (creates group, installs binaries, systemd unit, CNI config)
 make build
 sudo ./scripts/setup-kata.sh
 
@@ -79,6 +79,32 @@ sg misbah -c 'misbah container start --spec agent.yaml --runtime kata'
 # After re-login (misbah group active):
 misbah container start --spec agent.yaml --runtime kata
 ```
+
+### Daemon Configuration
+
+The daemon reads `/etc/misbah/daemon.yaml`. Config loading order: built-in defaults -> config file -> environment variables.
+
+```yaml
+# /etc/misbah/daemon.yaml
+daemon:
+  socket: /run/misbah/permission.sock
+  group: misbah            # socket group (Docker model: root:<group> 660)
+  log_level: info
+  non_interactive: false   # true = auto-deny all unknown resources
+
+kata:
+  endpoint: unix:///run/containerd/containerd.sock
+  handler: kata
+  annotations:             # injected per-pod via CRI, no global Kata config editing
+    io.katacontainers.config.runtime.internetworking_model: "none"
+    io.katacontainers.config.runtime.disable_new_netns: "true"
+
+permissions:
+  whitelist: /var/lib/misbah/whitelist.yaml
+  audit_log: /var/lib/misbah/audit.log
+```
+
+Environment variable overrides: `MISBAH_DAEMON_SOCKET`, `MISBAH_CRI_ENDPOINT`, `MISBAH_RUNTIME_HANDLER`.
 
 ### Container Spec Example
 

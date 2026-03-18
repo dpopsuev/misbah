@@ -122,7 +122,7 @@ func TestEnvToKeyValues_Empty(t *testing.T) {
 }
 
 func TestBuildPodSandboxConfig(t *testing.T) {
-	config := BuildPodSandboxConfig("test-agent")
+	config := BuildPodSandboxConfig("test-agent", nil)
 
 	require.NotNil(t, config)
 	require.NotNil(t, config.Metadata)
@@ -199,7 +199,7 @@ func TestBuildContainerConfig_NoResources(t *testing.T) {
 }
 
 func TestApplyNetworkConfig_Nil(t *testing.T) {
-	config := BuildPodSandboxConfig("test")
+	config := BuildPodSandboxConfig("test", nil)
 	ApplyNetworkConfig(config, nil)
 	// Should be unchanged
 	assert.Empty(t, config.Hostname)
@@ -207,7 +207,7 @@ func TestApplyNetworkConfig_Nil(t *testing.T) {
 }
 
 func TestApplyNetworkConfig_Full(t *testing.T) {
-	config := BuildPodSandboxConfig("test")
+	config := BuildPodSandboxConfig("test", nil)
 	network := &model.NetworkConfig{
 		Mode:       "none",
 		DNSServers: []string{"8.8.8.8", "8.8.4.4"},
@@ -225,7 +225,7 @@ func TestApplyNetworkConfig_Full(t *testing.T) {
 }
 
 func TestApplyNetworkConfig_HostMode(t *testing.T) {
-	config := BuildPodSandboxConfig("test")
+	config := BuildPodSandboxConfig("test", nil)
 	network := &model.NetworkConfig{Mode: "host"}
 	ApplyNetworkConfig(config, network)
 
@@ -234,7 +234,7 @@ func TestApplyNetworkConfig_HostMode(t *testing.T) {
 }
 
 func TestApplyNetworkConfig_PodMode(t *testing.T) {
-	config := BuildPodSandboxConfig("test")
+	config := BuildPodSandboxConfig("test", nil)
 	network := &model.NetworkConfig{Mode: "pod", Hostname: "my-agent"}
 	ApplyNetworkConfig(config, network)
 

@@ -211,7 +211,8 @@ func TestRunPodSandbox(t *testing.T) {
 	client, cleanup := startFakeServer(t)
 	defer cleanup()
 
-	sandboxID, err := client.RunPodSandbox(context.Background(), "test-sandbox", "kata")
+	sandboxConfig := BuildPodSandboxConfig("test-sandbox", nil)
+	sandboxID, err := client.RunPodSandbox(context.Background(), sandboxConfig, "kata")
 	require.NoError(t, err)
 	assert.NotEmpty(t, sandboxID)
 	assert.Contains(t, sandboxID, "sandbox-")
@@ -224,11 +225,11 @@ func TestContainerLifecycle(t *testing.T) {
 	ctx := context.Background()
 
 	// 1. Create sandbox
-	sandboxID, err := client.RunPodSandbox(ctx, "test", "kata")
+	sandboxConfig := BuildPodSandboxConfig("test", nil)
+	sandboxID, err := client.RunPodSandbox(ctx, sandboxConfig, "kata")
 	require.NoError(t, err)
 
 	// 2. Create container
-	sandboxConfig := BuildPodSandboxConfig("test")
 	containerConfig := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{Name: "test-container"},
 		Image:    &runtimeapi.ImageSpec{Image: "alpine:latest"},
@@ -279,7 +280,7 @@ func TestCreateContainer_InvalidSandbox(t *testing.T) {
 	client, cleanup := startFakeServer(t)
 	defer cleanup()
 
-	sandboxConfig := BuildPodSandboxConfig("test")
+	sandboxConfig := BuildPodSandboxConfig("test", nil)
 	containerConfig := &runtimeapi.ContainerConfig{
 		Metadata: &runtimeapi.ContainerMetadata{Name: "test"},
 		Image:    &runtimeapi.ImageSpec{Image: "alpine:latest"},
