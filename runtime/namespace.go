@@ -154,13 +154,13 @@ func (nm *NamespaceManager) buildMountScript(mounts []model.MountSpec) string {
 		}
 	}
 
-	// Mount daemon socket if it exists on the host
+	// Mount daemon socket if it exists and is accessible
 	socketPath := config.GetDaemonSocket()
 	if _, err := os.Stat(socketPath); err == nil {
 		socketDir := filepath.Dir(socketPath)
-		fmt.Fprintf(&script, "mkdir -p \"%s\"\n", socketDir)
-		fmt.Fprintf(&script, "touch \"%s\"\n", socketPath)
-		fmt.Fprintf(&script, "mount --bind \"%s\" \"%s\"\n", socketPath, socketPath)
+		fmt.Fprintf(&script, "if mkdir -p \"%s\" 2>/dev/null && touch \"%s\" 2>/dev/null; then\n", socketDir, socketPath)
+		fmt.Fprintf(&script, "  mount --bind \"%s\" \"%s\"\n", socketPath, socketPath)
+		fmt.Fprintf(&script, "fi\n")
 		nm.logger.Debugf("Daemon socket mount added: %s", socketPath)
 	}
 
