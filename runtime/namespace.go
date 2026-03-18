@@ -216,10 +216,19 @@ func (nm *NamespaceManager) buildProcMount(mount model.MountSpec) string {
 	return script.String()
 }
 
+// shellQuote escapes a string for safe embedding in a POSIX shell command.
+// Uses single-quote wrapping with escaped embedded single quotes.
+func shellQuote(arg string) string {
+	return "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
+}
+
 // buildShellCommand builds the complete shell command to execute in the container.
 func (nm *NamespaceManager) buildShellCommand(spec *model.ContainerSpec, mountScript string) string {
-	// Join command arguments
-	cmdStr := strings.Join(spec.Process.Command, " ")
+	var quoted []string
+	for _, arg := range spec.Process.Command {
+		quoted = append(quoted, shellQuote(arg))
+	}
+	cmdStr := strings.Join(quoted, " ")
 
 	return fmt.Sprintf(`
 		set -e

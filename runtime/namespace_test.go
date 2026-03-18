@@ -196,7 +196,74 @@ func TestNamespaceManagerBuildShellCommand(t *testing.T) {
 	assert.Contains(t, cmd, "set -e")
 	assert.Contains(t, cmd, "# mount script here")
 	assert.Contains(t, cmd, "cd \"/container/workspace\"")
-	assert.Contains(t, cmd, "exec /usr/bin/claude --help")
+	assert.Contains(t, cmd, "exec '/usr/bin/claude' '--help'")
+}
+
+func TestBuildShellCommand_BashDashC(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	spec := &model.ContainerSpec{
+		Process: model.ProcessSpec{
+			Command: []string{"/bin/bash", "-c", "echo hello && sleep 5"},
+			Cwd:     "/tmp",
+		},
+	}
+
+	cmd := nm.buildShellCommand(spec, "")
+	// The multi-word -c argument must be preserved as a single quoted string
+	assert.Contains(t, cmd, "'/bin/bash' '-c' 'echo hello && sleep 5'")
+}
+
+func TestBuildShellCommand_ArgsWithSpaces(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	spec := &model.ContainerSpec{
+		Process: model.ProcessSpec{
+			Command: []string{"prog", "arg with spaces", "another arg"},
+			Cwd:     "/tmp",
+		},
+	}
+
+	cmd := nm.buildShellCommand(spec, "")
+	assert.Contains(t, cmd, "'prog' 'arg with spaces' 'another arg'")
+}
+
+func TestBuildShellCommand_SingleQuoteInArg(t *testing.T) {
+	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
+	nm := NewNamespaceManager(logger)
+
+	spec := &model.ContainerSpec{
+		Process: model.ProcessSpec{
+			Command: []string{"echo", "it's working"},
+			Cwd:     "/tmp",
+		},
+	}
+
+	cmd := nm.buildShellCommand(spec, "")
+	// Single quote in arg must be escaped: it's → 'it'\''s working'
+	assert.Contains(t, cmd, "'echo' 'it'\\''s working'")
+}
+
+func TestShellQuote(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"simple", "'simple'"},
+		{"with spaces", "'with spaces'"},
+		{"it's", "'it'\\''s'"},
+		{"", "''"},
+		{"--flag=value", "'--flag=value'"},
+		{"hello world", "'hello world'"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.expected, shellQuote(tt.input))
+		})
+	}
 }
 
 func TestNamespaceManagerCreateContainer_InvalidSpec(t *testing.T) {
@@ -243,12 +310,3 @@ func TestNamespaceManagerCreateContainer_NonLinux(t *testing.T) {
 	assert.Contains(t, err.Error(), "only supported on Linux")
 }
 
-func TestNamespaceManagerCreateNamespace_DeprecationWarning(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("Namespace tests require Linux")
-	}
-
-	// This test verifies the deprecated CreateNamespace still works
-	// Full integration tests are in test/integration/
-	t.Skip("Integration tests for CreateNamespace are in test/integration/")
-}
