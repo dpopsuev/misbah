@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dpopsuev/misbah/metrics"
-	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,46 +31,6 @@ func TestBindMounterPrepareMountPoint(t *testing.T) {
 	info, err := os.Stat(mountPath)
 	assert.NoError(t, err)
 	assert.True(t, info.IsDir())
-}
-
-func TestBindMounterValidateSources(t *testing.T) {
-	tmpDir := t.TempDir()
-	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
-	bm := NewBindMounter(logger)
-
-	// Create test directories
-	source1 := filepath.Join(tmpDir, "source1")
-	source2 := filepath.Join(tmpDir, "source2")
-	require.NoError(t, os.MkdirAll(source1, 0755))
-	require.NoError(t, os.MkdirAll(source2, 0755))
-
-	t.Run("valid sources", func(t *testing.T) {
-		sources := []model.Source{
-			{Path: source1, Mount: "source1"},
-			{Path: source2, Mount: "source2"},
-		}
-
-		err := bm.ValidateSources(sources)
-		assert.NoError(t, err)
-	})
-
-	t.Run("non-existent source", func(t *testing.T) {
-		sources := []model.Source{
-			{Path: filepath.Join(tmpDir, "nonexistent"), Mount: "source1"},
-		}
-
-		err := bm.ValidateSources(sources)
-		assert.Error(t, err)
-	})
-
-	t.Run("invalid mount name", func(t *testing.T) {
-		sources := []model.Source{
-			{Path: source1, Mount: "invalid mount"},
-		}
-
-		err := bm.ValidateSources(sources)
-		assert.Error(t, err)
-	})
 }
 
 func TestBindMounterCleanup(t *testing.T) {

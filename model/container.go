@@ -278,11 +278,23 @@ func (m *ContainerMetadata) Validate() error {
 		return fmt.Errorf("container name is required")
 	}
 
-	// Use existing workspace name validation
-	if err := ValidateWorkspaceName(m.Name); err != nil {
+	if err := validateContainerName(m.Name); err != nil {
 		return fmt.Errorf("invalid container name: %w", err)
 	}
 
+	return nil
+}
+
+// validateContainerName checks that a name contains only alphanumeric chars, dashes, and underscores.
+func validateContainerName(name string) error {
+	if name[0] == '-' || name[0] == '_' {
+		return fmt.Errorf("%w: %s (cannot start with dash or underscore)", ErrInvalidContainerName, name)
+	}
+	for _, c := range name {
+		if !((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_') {
+			return fmt.Errorf("%w: %q (only alphanumeric, dash, and underscore allowed)", ErrInvalidContainerName, string(c))
+		}
+	}
 	return nil
 }
 

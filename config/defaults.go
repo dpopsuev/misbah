@@ -10,17 +10,11 @@ const (
 	// DefaultConfigDir is the default configuration directory.
 	DefaultConfigDir = ".config/misbah"
 
-	// DefaultWorkspacesDir is the default workspaces directory.
-	DefaultWorkspacesDir = "workspaces"
-
 	// DefaultTempDir is the default temporary directory for mounts.
 	DefaultTempDir = "/tmp/misbah"
 
 	// DefaultLocksDir is the default directory for lock files (relative to TempDir).
 	DefaultLocksDir = ".locks"
-
-	// ManifestFileName is the standard manifest file name.
-	ManifestFileName = "manifest.yaml"
 
 	// LockFileExt is the lock file extension.
 	LockFileExt = ".lock"
@@ -65,15 +59,6 @@ const (
 	// EnvContainer is set inside the container to identify it.
 	EnvContainer = "MISBAH_CONTAINER"
 
-	// EnvWorkspace is set for legacy workspace compatibility.
-	EnvWorkspace = "MISBAH_WORKSPACE"
-
-	// EnvProvider is set to identify the provider/command.
-	EnvProvider = "MISBAH_PROVIDER"
-
-	// EnvLockPID is set to the lock PID.
-	EnvLockPID = "MISBAH_LOCK_PID"
-
 	// EnvCRIEndpoint overrides the CRI endpoint.
 	EnvCRIEndpoint = "MISBAH_CRI_ENDPOINT"
 
@@ -98,21 +83,6 @@ func GetConfigDir() string {
 		return filepath.Join("/tmp", DefaultConfigDir)
 	}
 	return filepath.Join(homeDir, DefaultConfigDir)
-}
-
-// GetWorkspacesDir returns the workspaces directory path.
-func GetWorkspacesDir() string {
-	return filepath.Join(GetConfigDir(), DefaultWorkspacesDir)
-}
-
-// GetWorkspaceDir returns the directory for a specific workspace.
-func GetWorkspaceDir(workspace string) string {
-	return filepath.Join(GetWorkspacesDir(), workspace)
-}
-
-// GetManifestPath returns the path to a workspace's manifest file.
-func GetManifestPath(workspace string) string {
-	return filepath.Join(GetWorkspaceDir(workspace), ManifestFileName)
 }
 
 // GetTempDir returns the temporary directory for mounts.

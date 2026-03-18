@@ -261,39 +261,3 @@ func (nm *NamespaceManager) CheckNamespaceSupport() error {
 	return nil
 }
 
-// CreateNamespace is deprecated. Use CreateContainer instead.
-// Kept for backward compatibility during transition.
-func (nm *NamespaceManager) CreateNamespace(mountPath string, sources []model.Source, providerBinary string, env []string) error {
-	nm.logger.Warnf("CreateNamespace is deprecated, use CreateContainer instead")
-
-	// Convert to ContainerSpec
-	spec := &model.ContainerSpec{
-		Version: "1.0",
-		Metadata: model.ContainerMetadata{
-			Name: "legacy-container",
-		},
-		Process: model.ProcessSpec{
-			Command: strings.Fields(providerBinary),
-			Env:     env,
-			Cwd:     mountPath,
-		},
-		Namespaces: model.NamespaceSpec{
-			User:  true,
-			Mount: true,
-			PID:   true,
-		},
-		Mounts: make([]model.MountSpec, 0, len(sources)),
-	}
-
-	// Convert sources to mounts
-	for _, source := range sources {
-		spec.Mounts = append(spec.Mounts, model.MountSpec{
-			Type:        "bind",
-			Source:      source.Path,
-			Destination: fmt.Sprintf("%s/%s", mountPath, source.Mount),
-			Options:     []string{"rw"},
-		})
-	}
-
-	return nm.CreateContainer(spec, nil)
-}

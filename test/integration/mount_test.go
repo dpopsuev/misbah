@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/dpopsuev/misbah/metrics"
-	"github.com/dpopsuev/misbah/model"
 	msbruntime "github.com/dpopsuev/misbah/runtime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -75,23 +74,6 @@ func TestBindMounterIntegration(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := metrics.NewJSONLogger(metrics.LogLevelDebug)
 	bm := msbruntime.NewBindMounter(logger)
-
-	// Create test sources
-	sourceA := filepath.Join(tmpDir, "source-a")
-	sourceB := filepath.Join(tmpDir, "source-b")
-
-	require.NoError(t, os.MkdirAll(sourceA, 0755))
-	require.NoError(t, os.MkdirAll(sourceB, 0755))
-
-	sources := []model.Source{
-		{Path: sourceA, Mount: "source-a"},
-		{Path: sourceB, Mount: "source-b"},
-	}
-
-	t.Run("validate_sources", func(t *testing.T) {
-		err := bm.ValidateSources(sources)
-		assert.NoError(t, err)
-	})
 
 	t.Run("prepare_mount_point", func(t *testing.T) {
 		mountPath := filepath.Join(tmpDir, "mount")

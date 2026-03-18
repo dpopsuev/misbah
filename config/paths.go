@@ -50,16 +50,6 @@ func EnsureConfigDir() error {
 	return EnsureDir(GetConfigDir())
 }
 
-// EnsureWorkspacesDir ensures the workspaces directory exists.
-func EnsureWorkspacesDir() error {
-	return EnsureDir(GetWorkspacesDir())
-}
-
-// EnsureWorkspaceDir ensures a specific workspace directory exists.
-func EnsureWorkspaceDir(workspace string) error {
-	return EnsureDir(GetWorkspaceDir(workspace))
-}
-
 // EnsureTempDir ensures the temporary directory exists.
 func EnsureTempDir() error {
 	return EnsureDir(GetTempDir())
@@ -85,36 +75,3 @@ func IsDirectory(path string) bool {
 	return info.IsDir()
 }
 
-// ListWorkspaces returns a list of workspace names.
-func ListWorkspaces() ([]string, error) {
-	workspacesDir := GetWorkspacesDir()
-
-	// Check if workspaces directory exists
-	if !PathExists(workspacesDir) {
-		return []string{}, nil
-	}
-
-	entries, err := os.ReadDir(workspacesDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read workspaces directory: %w", err)
-	}
-
-	var workspaces []string
-	for _, entry := range entries {
-		if entry.IsDir() {
-			// Check if manifest exists
-			manifestPath := GetManifestPath(entry.Name())
-			if PathExists(manifestPath) {
-				workspaces = append(workspaces, entry.Name())
-			}
-		}
-	}
-
-	return workspaces, nil
-}
-
-// WorkspaceExists checks if a workspace exists.
-func WorkspaceExists(workspace string) bool {
-	manifestPath := GetManifestPath(workspace)
-	return PathExists(manifestPath)
-}
