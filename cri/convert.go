@@ -2,17 +2,12 @@ package cri
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/proxy"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
-// ContainerDaemonSocketPath is the well-known path inside the container for the daemon socket.
-const ContainerDaemonSocketPath = "/run/misbah/permission.sock"
 
 // Mount option constants.
 const (
@@ -165,36 +160,7 @@ func BuildContainerConfig(spec *model.ContainerSpec) *runtimeapi.ContainerConfig
 		}
 	}
 
-	// Mount daemon socket into container if it exists on host
-	socketPath := getConfigFunc().GetDaemonSocket()
-	if _, err := os.Stat(socketPath); err == nil {
-		config.Mounts = append(config.Mounts, &runtimeapi.Mount{
-			ContainerPath: ContainerDaemonSocketPath,
-			HostPath:      socketPath,
-		})
-
-		// Inject proxy environment variables so agent traffic routes through the network proxy
-		proxyAddr := fmt.Sprintf("127.0.0.1:%d", proxy.DefaultProxyPort)
-		proxyEnvs := proxy.ProxyEnvVars(proxyAddr, ContainerDaemonSocketPath)
-		config.Envs = append(config.Envs, EnvToKeyValues(proxyEnvs)...)
-	}
-
 	return config
-}
-
-// configAccessor allows testing without depending on actual config state.
-var getConfigFunc = func() daemonSocketConfig {
-	return defaultDaemonSocketConfig{}
-}
-
-type daemonSocketConfig interface {
-	GetDaemonSocket() string
-}
-
-type defaultDaemonSocketConfig struct{}
-
-func (defaultDaemonSocketConfig) GetDaemonSocket() string {
-	return config.GetDaemonSocket()
 }
 
 // parseMemoryToBytes converts a memory spec like "2GB" to bytes.
