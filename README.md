@@ -66,17 +66,18 @@ bin/misbah container start --spec agent.yaml
 ### Kata Container (requires infrastructure)
 
 ```bash
-# Install: containerd, kata-containers, CNI plugins
-# See docs/INSTALL.md
+# Prerequisites: containerd, kata-containers, KVM, CNI plugins
+# On Fedora: sudo dnf install containerd kata-containers containernetworking-plugins
 
-# Install and start daemon
-sudo cp bin/misbah bin/misbah-proxy /usr/local/bin/
-sudo cp assets/misbah-daemon.service /etc/systemd/system/
-sudo groupadd misbah && sudo usermod -aG misbah $USER
-sudo systemctl enable --now misbah-daemon
+# One-command setup (configures containerd, Kata, CNI, group, daemon)
+make build
+sudo ./scripts/setup-kata.sh
 
 # Run (as unprivileged user in misbah group)
-bin/misbah container start --spec agent.yaml --runtime kata
+sg misbah -c 'misbah container start --spec agent.yaml --runtime kata'
+
+# After re-login (misbah group active):
+misbah container start --spec agent.yaml --runtime kata
 ```
 
 ### Container Spec Example
@@ -165,7 +166,7 @@ assets/              Systemd unit file
 
 **Namespace backend**: Operational. Containers run with full isolation, progressive trust wired end-to-end.
 
-**Kata backend**: Code complete. Blocked by upstream Kata networking issue on Fedora 43 / kernel 6.18 (MSB-MIR-4).
+**Kata backend**: Operational. Live tested: CLI → daemon → CRI → containerd → Kata VM (QEMU/KVM) → alpine container.
 
 ## License
 

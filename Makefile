@@ -21,6 +21,11 @@ build:
 install:
 	@echo "Installing $(BINARY_NAME)..."
 	$(GO) install $(LDFLAGS) ./cmd/misbah
+	$(GO) install $(LDFLAGS) ./cmd/misbah-proxy
+
+## setup-kata: Configure host for Kata backend (run as root)
+setup-kata: build
+	@sudo ./scripts/setup-kata.sh
 
 ## test: Run all tests
 test: test-unit test-integration
