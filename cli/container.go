@@ -1,12 +1,13 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/dpopsuev/misbah/config"
-	"github.com/dpopsuev/misbah/cri"
+	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/model"
 	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
@@ -294,46 +295,45 @@ func runContainerValidate(cmd *cobra.Command, args []string) error {
 func runContainerStart(cmd *cobra.Command, args []string) error {
 	logger.Infof("Starting container from specification: %s", containerSpecFile)
 
-	// Load container spec
 	spec, err := model.LoadContainerSpec(containerSpecFile)
 	if err != nil {
 		return fmt.Errorf("failed to load container spec: %w", err)
 	}
 
-	// CLI --runtime flag overrides spec
 	if containerRuntime != "" {
 		spec.Runtime = containerRuntime
 	}
 
 	logger.Infof("Loaded container specification: %s (runtime=%s)", spec.Metadata.Name, spec.Runtime)
 
-	// Select backend based on runtime
-	var backend runtime.ContainerBackend
 	if spec.Runtime == "kata" {
-		endpoint := config.GetCRIEndpoint()
-		if ep, _ := cmd.Flags().GetString("cri-endpoint"); ep != "" {
-			endpoint = ep
-		}
-		handler := config.GetRuntimeHandler()
-
-		b, err := cri.NewBackend(endpoint, handler, logger)
-		if err != nil {
-			return fmt.Errorf("failed to create CRI backend: %w", err)
-		}
-		defer b.Close()
-		backend = b
+		return startViaDaemon(spec)
 	}
 
-	// Create lifecycle manager with selected backend
-	lifecycle := runtime.NewLifecycle(logger, recorder, backend)
+	// Direct: namespace backend (daemonless)
+	lifecycle := runtime.NewLifecycle(logger, recorder)
 
-	logger.Infof("Mounting container: %s", spec.Metadata.Name)
+	logger.Infof("Starting container: %s", spec.Metadata.Name)
 
 	if err := lifecycle.Start(spec); err != nil {
 		return fmt.Errorf("failed to start container: %w", err)
 	}
 
 	logger.Infof("Container %s exited successfully", spec.Metadata.Name)
+	return nil
+}
+
+func startViaDaemon(spec *model.ContainerSpec) error {
+	socketPath := config.GetDaemonSocket()
+	client := daemon.NewClient(socketPath, logger)
+	defer client.Close()
+
+	resp, err := client.ContainerStart(context.Background(), spec)
+	if err != nil {
+		return fmt.Errorf("daemon error: %w (is the daemon running? start with: misbah daemon start)", err)
+	}
+
+	logger.Infof("Container %s: %s", resp.ID, resp.Status)
 	return nil
 }
 

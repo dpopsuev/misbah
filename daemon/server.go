@@ -12,27 +12,43 @@ import (
 	"github.com/dpopsuev/misbah/metrics"
 )
 
-// Server is the permission daemon HTTP server on a Unix socket.
+// Server is the unified daemon HTTP server on a Unix socket.
+// Handles both permission brokering and container lifecycle (for Kata).
 type Server struct {
 	whitelist  *WhitelistStore
 	prompter   Prompter
 	audit      *AuditLogger
 	logger     *metrics.Logger
+	lifecycle  ContainerLifecycle
 	listener   net.Listener
 	httpServer *http.Server
 }
 
-// NewServer creates a new permission daemon server.
-func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger, logger *metrics.Logger) *Server {
+// ServerOption configures optional server capabilities.
+type ServerOption func(*Server)
+
+// WithLifecycle enables container lifecycle endpoints (for Kata backend).
+func WithLifecycle(lc ContainerLifecycle) ServerOption {
+	return func(s *Server) {
+		s.lifecycle = lc
+	}
+}
+
+// NewServer creates a new daemon server.
+func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger, logger *metrics.Logger, opts ...ServerOption) *Server {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
-	return &Server{
+	s := &Server{
 		whitelist: whitelist,
 		prompter:  prompter,
 		audit:     audit,
 		logger:    logger,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // Start listens on the given Unix socket path and serves requests.
@@ -58,6 +74,9 @@ func (s *Server) Start(socketPath string) error {
 	mux.HandleFunc("/permission/request", s.handleRequest)
 	mux.HandleFunc("/permission/check", s.handleCheck)
 	mux.HandleFunc("/permission/list", s.handleList)
+	mux.HandleFunc("/container/start", s.handleContainerStart)
+	mux.HandleFunc("/container/stop", s.handleContainerStop)
+	mux.HandleFunc("/container/destroy", s.handleContainerDestroy)
 
 	s.httpServer = &http.Server{Handler: mux}
 
@@ -175,4 +194,101 @@ func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(map[string]string{"error": message})
+}
+
+// handleContainerStart starts a container via the lifecycle manager.
+func (s *Server) handleContainerStart(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available (CRI backend not configured)")
+		return
+	}
+
+	var req ContainerStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	if req.Spec == nil {
+		s.writeError(w, http.StatusBadRequest, "spec is required")
+		return
+	}
+
+	name := req.Spec.Metadata.Name
+	s.logger.Infof("Starting container via daemon: %s", name)
+
+	// Start in a goroutine — lifecycle.Start blocks until the container exits
+	go func() {
+		if err := s.lifecycle.Start(req.Spec); err != nil {
+			s.logger.Errorf("Container %s failed: %v", name, err)
+		} else {
+			s.logger.Infof("Container %s exited successfully", name)
+		}
+	}()
+
+	s.writeJSON(w, ContainerStartResponse{
+		ID:     name,
+		Status: "started",
+	})
+}
+
+// handleContainerStop stops a running container.
+func (s *Server) handleContainerStop(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available")
+		return
+	}
+
+	var req ContainerStopRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	s.logger.Infof("Stopping container via daemon: %s (force=%v)", req.Name, req.Force)
+
+	if err := s.lifecycle.Stop(req.Name, req.Force); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("stop failed: %v", err))
+		return
+	}
+
+	s.writeJSON(w, ContainerActionResponse{Status: "stopped"})
+}
+
+// handleContainerDestroy destroys a container and cleans up resources.
+func (s *Server) handleContainerDestroy(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available")
+		return
+	}
+
+	var req ContainerDestroyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	s.logger.Infof("Destroying container via daemon: %s", req.Name)
+
+	if err := s.lifecycle.Destroy(req.Name); err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("destroy failed: %v", err))
+		return
+	}
+
+	s.writeJSON(w, ContainerActionResponse{Status: "destroyed"})
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,6 +44,9 @@ func startTestServer(t *testing.T, whitelist *WhitelistStore, prompter Prompter)
 		mux.HandleFunc("/permission/request", server.handleRequest)
 		mux.HandleFunc("/permission/check", server.handleCheck)
 		mux.HandleFunc("/permission/list", server.handleList)
+		mux.HandleFunc("/container/start", server.handleContainerStart)
+		mux.HandleFunc("/container/stop", server.handleContainerStop)
+		mux.HandleFunc("/container/destroy", server.handleContainerDestroy)
 
 		server.httpServer = &http.Server{Handler: mux}
 		close(ready)
@@ -246,4 +250,58 @@ type fixedPrompter struct {
 
 func (f *fixedPrompter) Prompt(req *PermissionRequest) (Decision, error) {
 	return f.decision, nil
+}
+
+// --- Container endpoint tests ---
+
+func TestContainerStart_NoLifecycle(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp := postJSON(t, client, "/container/start", ContainerStartRequest{
+		Spec: &model.ContainerSpec{
+			Version:  "1.0",
+			Metadata: model.ContainerMetadata{Name: "test"},
+			Process:  model.ProcessSpec{Command: []string{"/bin/true"}, Cwd: "/"},
+			Namespaces: model.NamespaceSpec{User: true, Mount: true},
+		},
+	})
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+
+	var errResp map[string]string
+	json.NewDecoder(resp.Body).Decode(&errResp)
+	assert.Contains(t, errResp["error"], "not available")
+}
+
+func TestContainerStop_NoLifecycle(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp := postJSON(t, client, "/container/stop", ContainerStopRequest{Name: "test"})
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+}
+
+func TestContainerDestroy_NoLifecycle(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp := postJSON(t, client, "/container/destroy", ContainerDestroyRequest{Name: "test"})
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+}
+
+func TestContainerStart_MissingSpec(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp := postJSON(t, client, "/container/start", ContainerStartRequest{})
+	defer resp.Body.Close()
+
+	// No lifecycle, so service unavailable before spec check
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
 }

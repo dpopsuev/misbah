@@ -6,7 +6,9 @@ import (
 	"syscall"
 
 	"github.com/dpopsuev/misbah/config"
+	"github.com/dpopsuev/misbah/cri"
 	"github.com/dpopsuev/misbah/daemon"
+	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
 )
 
@@ -89,7 +91,23 @@ func runDaemonStart(cmd *cobra.Command, args []string) error {
 		prompter = daemon.NewTerminalPrompter()
 	}
 
-	server := daemon.NewServer(whitelist, prompter, audit, logger)
+	// Initialize CRI backend for Kata containers
+	var opts []daemon.ServerOption
+
+	endpoint := config.GetCRIEndpoint()
+	handler := config.GetRuntimeHandler()
+
+	criBackend, criErr := cri.NewBackend(endpoint, handler, logger)
+	if criErr != nil {
+		logger.Warnf("CRI backend unavailable: %v (Kata containers disabled)", criErr)
+	} else {
+		lifecycle := runtime.NewLifecycle(logger, recorder, criBackend)
+		opts = append(opts, daemon.WithLifecycle(lifecycle))
+		defer criBackend.Close()
+		logger.Infof("CRI backend initialized (endpoint=%s, handler=%s)", endpoint, handler)
+	}
+
+	server := daemon.NewServer(whitelist, prompter, audit, logger, opts...)
 
 	// Graceful shutdown on SIGTERM/SIGINT
 	sigChan := make(chan os.Signal, 1)
