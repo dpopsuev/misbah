@@ -25,15 +25,15 @@ var (
 var rootCmd = &cobra.Command{
 	Use:   "misbah",
 	Short: "Misbah - Workspace manager for CLI AI agents",
-	Long: `Misbah creates unified workspaces from multiple source repositories using
-Linux user namespaces and bind mounts, enabling CLI AI agents to work
-seamlessly across project boundaries.
+	Long: `Misbah is a container manager for CLI AI agents that creates isolated
+execution environments using Kata Containers, Linux namespaces, and cgroups
+with a progressive trust permission system.
 
 Examples:
-  misbah create -w myworkspace
-  misbah mount -w myworkspace -a claude
-  misbah peaks
-  misbah summit`,
+  misbah container create --spec container.yaml --name agent-main
+  misbah container start --spec container.yaml
+  misbah container list
+  misbah daemon start`,
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize logger
 		level := metrics.LogLevel(logLevel)
@@ -77,14 +77,6 @@ func init() {
 	rootCmd.PersistentFlags().String("cri-endpoint", "", "CRI endpoint (default: unix:///run/containerd/containerd.sock)")
 
 	// Add commands
-	rootCmd.AddCommand(mountCmd)
-	rootCmd.AddCommand(unmountCmd)
-	rootCmd.AddCommand(createCmd)
-	rootCmd.AddCommand(editCmd)
-	rootCmd.AddCommand(validateCmd)
-	rootCmd.AddCommand(peaksCmd)
-	rootCmd.AddCommand(summitCmd)
-	rootCmd.AddCommand(serveCmd)
 	rootCmd.AddCommand(versionCmd)
 }
 
