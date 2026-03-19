@@ -1,0 +1,16 @@
+# Pre-approved domains for Claude Code
+# Copy to daemon whitelist to skip prompts:
+#   sudo cp assets/claude-whitelist.yaml /root/.config/misbah/whitelist.yaml
+#   sudo systemctl restart misbah-daemon
+
+rules:
+    # Claude API (via Google Cloud Vertex AI)
+    network:oauth2.googleapis.com: always
+    network:us-east5-aiplatform.googleapis.com: always
+
+    # Claude API (direct Anthropic — uncomment if using direct API key)
+    # network:api.anthropic.com: always
+
+    # Claude telemetry (optional — deny to block telemetry)
+    # network:sentry.io: always
+    # network:statsigapi.net: always
