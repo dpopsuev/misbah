@@ -310,6 +310,16 @@ func runContainerStart(cmd *cobra.Command, args []string) error {
 		return startViaDaemon(spec)
 	}
 
+	// Pre-load spec whitelist into daemon (if running)
+	if spec.Permissions != nil {
+		socketPath := config.GetDaemonSocket()
+		client := daemon.NewClient(socketPath, logger)
+		if err := client.WhitelistLoad(context.Background(), spec); err != nil {
+			logger.Debugf("Could not load whitelist into daemon: %v", err)
+		}
+		client.Close()
+	}
+
 	// Direct: namespace backend (daemonless)
 	lifecycle := runtime.NewLifecycle(logger, recorder)
 

@@ -68,6 +68,12 @@ func (c *Client) ContainerDestroy(ctx context.Context, name string) error {
 	return c.postAny(ctx, "/container/destroy", ContainerDestroyRequest{Name: name}, &resp)
 }
 
+// WhitelistLoad sends a container spec to the daemon to pre-load its whitelist rules.
+func (c *Client) WhitelistLoad(ctx context.Context, spec *model.ContainerSpec) error {
+	var resp ContainerActionResponse
+	return c.postAny(ctx, "/whitelist/load", ContainerStartRequest{Spec: spec}, &resp)
+}
+
 // Close cleans up the client's resources.
 func (c *Client) Close() {
 	c.httpClient.CloseIdleConnections()

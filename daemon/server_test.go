@@ -47,6 +47,7 @@ func startTestServer(t *testing.T, whitelist *WhitelistStore, prompter Prompter)
 		mux.HandleFunc("/container/start", server.handleContainerStart)
 		mux.HandleFunc("/container/stop", server.handleContainerStop)
 		mux.HandleFunc("/container/destroy", server.handleContainerDestroy)
+		mux.HandleFunc("/whitelist/load", server.handleWhitelistLoad)
 
 		server.httpServer = &http.Server{Handler: mux}
 		close(ready)

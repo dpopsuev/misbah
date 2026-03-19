@@ -84,6 +84,7 @@ func (s *Server) Start(socketPath string) error {
 	mux.HandleFunc("/container/start", s.handleContainerStart)
 	mux.HandleFunc("/container/stop", s.handleContainerStop)
 	mux.HandleFunc("/container/destroy", s.handleContainerDestroy)
+	mux.HandleFunc("/whitelist/load", s.handleWhitelistLoad)
 
 	s.httpServer = &http.Server{Handler: mux}
 
@@ -221,6 +222,29 @@ func setSocketGroupPermissions(socketPath, groupName string, logger *metrics.Log
 	return nil
 }
 
+// handleWhitelistLoad loads whitelist rules from a container spec.
+func (s *Server) handleWhitelistLoad(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req ContainerStartRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	if req.Spec != nil {
+		s.whitelist.LoadFromSpec(req.Spec)
+		if err := s.whitelist.Save(); err != nil {
+			s.logger.Warnf("Failed to persist whitelist: %v", err)
+		}
+	}
+
+	s.writeJSON(w, ContainerActionResponse{Status: "loaded"})
+}
+
 func (s *Server) writeError(w http.ResponseWriter, status int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -249,6 +273,9 @@ func (s *Server) handleContainerStart(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusBadRequest, "spec is required")
 		return
 	}
+
+	// Load spec whitelist into daemon's whitelist store
+	s.whitelist.LoadFromSpec(req.Spec)
 
 	name := req.Spec.Metadata.Name
 	s.logger.Infof("Starting container via daemon: %s", name)
