@@ -1,0 +1,55 @@
+version: "1.0"
+metadata:
+  name: claude-namespace
+  description: Claude Code in namespace container with proxy enforcement
+  labels:
+    provider: claude
+process:
+  command:
+    - /bin/bash
+    - -c
+    - |
+      echo "=== Misbah Namespace Container ==="
+      echo "HTTP_PROXY=$HTTP_PROXY"
+      echo ""
+
+      # Test 1: whitelisted domain should work
+      echo "--- Test 1: Whitelisted domain (oauth2.googleapis.com) ---"
+      HTTP_CODE=$(curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/.well-known/openid-configuration 2>/dev/null)
+      echo "Result: $HTTP_CODE"
+
+      # Test 2: non-whitelisted domain should be blocked (403)
+      echo "--- Test 2: Non-whitelisted domain (example.com) ---"
+      HTTP_CODE=$(curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" http://example.com 2>/dev/null)
+      echo "Result: $HTTP_CODE"
+
+      # Test 3: run claude with a simple prompt
+      echo "--- Test 3: Claude Code ---"
+      if command -v claude >/dev/null 2>&1; then
+        claude --print "Respond with exactly: MISBAH_OK" 2>&1 | head -5
+      else
+        echo "claude binary not found in PATH"
+      fi
+
+      echo ""
+      echo "=== Done ==="
+  env:
+    - MISBAH_CONTAINER=claude-namespace
+  cwd: /tmp
+namespaces:
+  user: true
+  mount: true
+  pid: true
+mounts:
+  - type: tmpfs
+    destination: /tmp
+    options:
+      - rw
+permissions:
+  default_policy: deny
+  network_whitelist:
+    - oauth2.googleapis.com
+    - us-east5-aiplatform.googleapis.com
+    - api.anthropic.com
+    - sentry.io
+    - statsigapi.net

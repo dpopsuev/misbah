@@ -1,0 +1,44 @@
+version: "1.0"
+metadata:
+  name: claude-kata
+  description: Claude Code in Kata VM with proxy enforcement
+  labels:
+    provider: claude
+runtime: kata
+image: docker.io/library/ubuntu:24.04
+process:
+  command:
+    - /bin/bash
+    - -c
+    - |
+      echo "=== Misbah Kata Container ==="
+      echo "HTTP_PROXY=${HTTP_PROXY:-NOT_SET}"
+      echo ""
+
+      # Test 1: whitelisted domain
+      echo "--- Test 1: Whitelisted domain (oauth2.googleapis.com) ---"
+      HTTP_CODE=$(curl -s --connect-timeout 10 -o /dev/null -w "%{http_code}" https://oauth2.googleapis.com/.well-known/openid-configuration 2>/dev/null)
+      echo "Result: $HTTP_CODE"
+
+      # Test 2: non-whitelisted domain should be blocked
+      echo "--- Test 2: Non-whitelisted domain (example.com) ---"
+      HTTP_CODE=$(curl -s --connect-timeout 10 -o /dev/null -w "%{http_code}" http://example.com 2>/dev/null)
+      echo "Result: $HTTP_CODE"
+
+      echo ""
+      echo "=== Done ==="
+  env:
+    - MISBAH_CONTAINER=claude-kata
+  cwd: /tmp
+namespaces:
+  user: true
+  mount: true
+mounts: []
+permissions:
+  default_policy: deny
+  network_whitelist:
+    - oauth2.googleapis.com
+    - us-east5-aiplatform.googleapis.com
+    - api.anthropic.com
+    - sentry.io
+    - statsigapi.net
