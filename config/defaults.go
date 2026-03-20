@@ -73,6 +73,16 @@ const (
 	DefaultCRITimeout     = 120
 )
 
+// Vsock transport defaults.
+const (
+	DefaultVsockPort   = uint32(DefaultProxyPort) // host vsock listen port
+	DefaultVsockBinDir = "/usr/local/lib/misbah"  // host path to misbah binaries
+	VsockHostCID       = 2                        // vsock CID for the host
+	ForwarderBinName   = "misbah-vsock-fwd"       // forwarder binary name
+	ForwarderMountPath = "/opt/misbah/bin"        // container-side mount path
+	DefaultNoProxy     = "localhost,127.0.0.1"    // default NO_PROXY value for VM-local forwarder
+)
+
 // GetConfigDir returns the configuration directory path.
 func GetConfigDir() string {
 	if configDir := os.Getenv(EnvConfigDir); configDir != "" {

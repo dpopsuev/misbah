@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/model"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
@@ -169,6 +170,70 @@ func BuildContainerConfig(spec *model.ContainerSpec) *runtimeapi.ContainerConfig
 	}
 
 	return config
+}
+
+// InjectVsockForwarder modifies a ContainerConfig to route traffic
+// through the in-VM vsock forwarder (misbah-vsock-fwd).
+// It:
+//  1. Mounts the forwarder binary into the container (readonly)
+//  2. Overrides HTTP_PROXY/HTTPS_PROXY env vars to the VM-local forwarder
+//  3. Wraps the command to start the forwarder in background before exec
+func InjectVsockForwarder(cc *runtimeapi.ContainerConfig, vsockPort uint32, binDir string) {
+	forwarderAddr := fmt.Sprintf("127.0.0.1:%d", config.DefaultProxyPort)
+	proxyURL := "http://" + forwarderAddr
+	upstreamAddr := fmt.Sprintf("%d:%d", config.VsockHostCID, vsockPort)
+
+	// 1. Mount forwarder binary directory
+	cc.Mounts = append(cc.Mounts, &runtimeapi.Mount{
+		ContainerPath: config.ForwarderMountPath,
+		HostPath:      binDir,
+		Readonly:      true,
+	})
+
+	// 2. Override proxy env vars to point to VM-local forwarder
+	proxyKeys := map[string]bool{
+		"HTTP_PROXY": true, "HTTPS_PROXY": true,
+		"http_proxy": true, "https_proxy": true,
+		"NO_PROXY": true, "no_proxy": true,
+	}
+
+	var filtered []*runtimeapi.KeyValue
+	for _, kv := range cc.Envs {
+		if !proxyKeys[kv.Key] {
+			filtered = append(filtered, kv)
+		}
+	}
+
+	filtered = append(filtered,
+		&runtimeapi.KeyValue{Key: "HTTP_PROXY", Value: proxyURL},
+		&runtimeapi.KeyValue{Key: "HTTPS_PROXY", Value: proxyURL},
+		&runtimeapi.KeyValue{Key: "http_proxy", Value: proxyURL},
+		&runtimeapi.KeyValue{Key: "https_proxy", Value: proxyURL},
+		&runtimeapi.KeyValue{Key: "NO_PROXY", Value: config.DefaultNoProxy},
+		&runtimeapi.KeyValue{Key: "no_proxy", Value: config.DefaultNoProxy},
+	)
+	cc.Envs = filtered
+
+	// 3. Wrap command: start forwarder in background, then exec original
+	if len(cc.Command) > 0 {
+		forwarderBin := config.ForwarderMountPath + "/" + config.ForwarderBinName
+		originalCmd := shellQuoteArgs(cc.Command)
+		wrapped := fmt.Sprintf(
+			"%s --net vsock --upstream %s &\nexec %s",
+			forwarderBin, upstreamAddr, originalCmd,
+		)
+		cc.Command = []string{"/bin/sh", "-c", wrapped}
+	}
+}
+
+// shellQuoteArgs returns a shell-safe string from a list of arguments.
+// Each argument is single-quoted with embedded single quotes escaped.
+func shellQuoteArgs(args []string) string {
+	quoted := make([]string, len(args))
+	for i, arg := range args {
+		quoted[i] = "'" + strings.ReplaceAll(arg, "'", "'\\''") + "'"
+	}
+	return strings.Join(quoted, " ")
 }
 
 // parseMemoryToBytes converts a memory spec like "2GB" to bytes.

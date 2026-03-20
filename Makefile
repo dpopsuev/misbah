@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-integration test-e2e test-e2e-claude install install-system uninstall-system clean lint fmt vet coverage help
+.PHONY: build test test-unit test-integration test-e2e test-e2e-netns test-e2e-claude install install-system uninstall-system clean lint fmt vet coverage help
 
 # Build variables
 BINARY_NAME=misbah
@@ -26,6 +26,7 @@ install:
 install-system: build
 	@echo "Installing system-wide..."
 	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)
+	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME)-vsock-fwd /usr/local/lib/misbah/$(BINARY_NAME)-vsock-fwd
 	install -Dm644 assets/misbah-daemon.service /etc/systemd/system/misbah-daemon.service
 	install -dm755 /etc/misbah
 	@test -f /etc/misbah/daemon.yaml || install -Dm644 assets/daemon.yaml /etc/misbah/daemon.yaml
@@ -116,6 +117,11 @@ test-e2e-llm-mcp:
 		$(GO) build -o ./misbah ./cmd/misbah; \
 		$(GO) test -v -tags=e2e,llm -run TestLLMWithMCP ./test/e2e/...; \
 	fi
+
+## test-e2e-netns: Run NetworkIsolator iptables integration tests (requires root)
+test-e2e-netns:
+	@echo "Running netns iptables integration tests..."
+	sudo $(GO) test -v -tags='e2e netns' ./daemon/...
 
 ## test-e2e-claude: Run E2E tests with Claude Code (requires claude binary + MISBAH_E2E_CLAUDE=true)
 test-e2e-claude:

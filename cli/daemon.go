@@ -114,6 +114,26 @@ func runDaemonStart(cmd *cobra.Command, args []string) error {
 	proxyMgr := daemon.NewProxyManager(checker, logger, isolator)
 	opts = append(opts, daemon.WithProxyManager(proxyMgr))
 
+	// Vsock transport for Kata containers
+	if daemonCfg.Vsock.Port > 0 {
+		opts = append(opts, daemon.WithVsockConfig(daemonCfg.Vsock.Port, daemonCfg.Vsock.BinDir))
+
+		vsockLn := daemon.NewVsockListener(proxyMgr, logger)
+		go func() {
+			ln, err := vsockListen(daemonCfg.Vsock.Port)
+			if err != nil {
+				logger.Warnf("Vsock listener unavailable: %v (Kata vsock transport disabled)", err)
+				return
+			}
+			if err := vsockLn.Start(ln); err != nil {
+				logger.Errorf("Vsock listener exited: %v", err)
+			}
+		}()
+
+		defer vsockLn.Stop(nil)
+		logger.Infof("Vsock transport configured (port=%d, bin_dir=%s)", daemonCfg.Vsock.Port, daemonCfg.Vsock.BinDir)
+	}
+
 	server := daemon.NewServer(whitelist, prompter, audit, logger, opts...)
 
 	// Graceful shutdown

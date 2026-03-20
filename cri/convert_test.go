@@ -243,6 +243,85 @@ func TestApplyNetworkConfig_PodMode(t *testing.T) {
 	assert.Nil(t, config.Linux.SecurityContext)
 }
 
+func TestInjectVsockForwarder(t *testing.T) {
+	spec := &model.ContainerSpec{
+		Metadata: model.ContainerMetadata{Name: "test"},
+		Process: model.ProcessSpec{
+			Command: []string{"/bin/bash", "-c", "echo hello"},
+			Env: []string{
+				"FOO=bar",
+				"HTTP_PROXY=http://10.88.0.1:45678",
+				"HTTPS_PROXY=http://10.88.0.1:45678",
+			},
+			Cwd: "/workspace",
+		},
+		Image: "alpine:latest",
+		Mounts: []model.MountSpec{
+			{Type: "bind", Source: "/tmp", Destination: "/workspace", Options: []string{"rw"}},
+		},
+	}
+
+	config := BuildContainerConfig(spec)
+	InjectVsockForwarder(config, 8118, "/usr/local/lib/misbah")
+
+	// Verify mount added
+	var foundMount bool
+	for _, m := range config.Mounts {
+		if m.ContainerPath == "/opt/misbah/bin" {
+			foundMount = true
+			assert.Equal(t, "/usr/local/lib/misbah", m.HostPath)
+			assert.True(t, m.Readonly)
+		}
+	}
+	assert.True(t, foundMount, "forwarder binary mount should be added")
+
+	// Verify env vars overridden to VM-local forwarder
+	envMap := make(map[string]string)
+	for _, kv := range config.Envs {
+		envMap[kv.Key] = kv.Value
+	}
+	assert.Equal(t, "http://127.0.0.1:8118", envMap["HTTP_PROXY"])
+	assert.Equal(t, "http://127.0.0.1:8118", envMap["HTTPS_PROXY"])
+	assert.Equal(t, "http://127.0.0.1:8118", envMap["http_proxy"])
+	assert.Equal(t, "http://127.0.0.1:8118", envMap["https_proxy"])
+	assert.Equal(t, "localhost,127.0.0.1", envMap["NO_PROXY"])
+	assert.Equal(t, "bar", envMap["FOO"], "non-proxy env vars should be preserved")
+
+	// Verify command wrapped with forwarder startup (args are shell-quoted)
+	require.Equal(t, []string{"/bin/sh", "-c"}, config.Command[:2])
+	assert.Contains(t, config.Command[2], "misbah-vsock-fwd")
+	assert.Contains(t, config.Command[2], "--upstream 2:8118")
+	assert.Contains(t, config.Command[2], "exec '/bin/bash' '-c' 'echo hello'")
+}
+
+func TestInjectVsockForwarder_QuotedArgs(t *testing.T) {
+	config := &runtimeapi.ContainerConfig{
+		Command: []string{"/bin/sh", "-c", "echo 'hello world'"},
+	}
+	InjectVsockForwarder(config, 8118, "/opt/bin")
+
+	require.Len(t, config.Command, 3)
+	// The single quote inside the arg should be escaped
+	assert.Contains(t, config.Command[2], "exec '/bin/sh' '-c' 'echo '\\''hello world'\\'''")
+}
+
+func TestInjectVsockForwarder_NoCommand(t *testing.T) {
+	config := &runtimeapi.ContainerConfig{
+		Envs: []*runtimeapi.KeyValue{{Key: "FOO", Value: "bar"}},
+	}
+	InjectVsockForwarder(config, 9999, "/opt/bin")
+
+	// With no command, Command should remain empty
+	assert.Empty(t, config.Command)
+
+	// Env vars still overridden
+	envMap := make(map[string]string)
+	for _, kv := range config.Envs {
+		envMap[kv.Key] = kv.Value
+	}
+	assert.Equal(t, "http://127.0.0.1:8118", envMap["HTTP_PROXY"])
+}
+
 func TestParseMemoryToBytes(t *testing.T) {
 	tests := []struct {
 		spec    string

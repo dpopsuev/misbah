@@ -78,6 +78,9 @@ func (b *Backend) Start(spec *model.ContainerSpec) (string, error) {
 
 	// 3. Create container
 	containerConfig := BuildContainerConfig(spec)
+	if spec.VsockForwarder != nil {
+		InjectVsockForwarder(containerConfig, spec.VsockForwarder.Port, spec.VsockForwarder.BinDir)
+	}
 	containerID, err := b.client.CreateContainer(ctx, sandboxID, containerConfig, sandboxConfig)
 	if err != nil {
 		_ = b.cleanupSandbox(ctx, sandboxID) // best-effort cleanup on error path

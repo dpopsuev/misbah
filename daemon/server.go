@@ -11,8 +11,15 @@ import (
 	"path/filepath"
 
 	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/model"
 	"github.com/dpopsuev/misbah/proxy"
 )
+
+// VsockConfig holds vsock transport settings for Kata containers.
+type VsockConfig struct {
+	Port   uint32 // host vsock listen port
+	BinDir string // host path to misbah binaries
+}
 
 // Server is the unified daemon HTTP server on a Unix socket.
 // Handles both permission brokering and container lifecycle (for Kata).
@@ -23,6 +30,7 @@ type Server struct {
 	logger     *metrics.Logger
 	lifecycle  ContainerLifecycle
 	proxyMgr   *ProxyManager
+	vsockCfg   *VsockConfig
 	listener   net.Listener
 	httpServer *http.Server
 }
@@ -41,6 +49,13 @@ func WithLifecycle(lc ContainerLifecycle) ServerOption {
 func WithProxyManager(pm *ProxyManager) ServerOption {
 	return func(s *Server) {
 		s.proxyMgr = pm
+	}
+}
+
+// WithVsockConfig enables vsock transport for Kata containers.
+func WithVsockConfig(port uint32, binDir string) ServerOption {
+	return func(s *Server) {
+		s.vsockCfg = &VsockConfig{Port: port, BinDir: binDir}
 	}
 }
 
@@ -299,8 +314,21 @@ func (s *Server) handleContainerStart(w http.ResponseWriter, r *http.Request) {
 			s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("proxy start failed: %v", proxyErr))
 			return
 		}
-		socketPath := s.listener.Addr().String()
-		req.Spec.Process.Env = append(req.Spec.Process.Env, proxy.ProxyEnvVars(proxyAddr, socketPath)...)
+
+		if req.Spec.Runtime == model.RuntimeKata && s.vsockCfg != nil {
+			// Kata path: proxy env vars point to VM-local forwarder,
+			// vsock forwarder config is injected into the CRI container config.
+			forwarderAddr := fmt.Sprintf("127.0.0.1:%d", s.vsockCfg.Port)
+			req.Spec.Process.Env = append(req.Spec.Process.Env, proxy.ProxyEnvVars(forwarderAddr, "")...)
+			req.Spec.VsockForwarder = &model.VsockForwarderConfig{
+				Port:   s.vsockCfg.Port,
+				BinDir: s.vsockCfg.BinDir,
+			}
+		} else {
+			// Namespace path: proxy env vars point directly to host proxy
+			socketPath := s.listener.Addr().String()
+			req.Spec.Process.Env = append(req.Spec.Process.Env, proxy.ProxyEnvVars(proxyAddr, socketPath)...)
+		}
 	}
 
 	// Start in a goroutine — lifecycle.Start blocks until the container exits

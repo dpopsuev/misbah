@@ -16,6 +16,12 @@ const (
 	MountTypeGitClone = "git-clone"
 )
 
+// Runtime backend constants.
+const (
+	RuntimeNamespace = "namespace"
+	RuntimeKata      = "kata"
+)
+
 // ContainerSpec represents a container specification conforming to MSB-SPC-2026-001.
 type ContainerSpec struct {
 	Version    string            `yaml:"version"`
@@ -27,9 +33,10 @@ type ContainerSpec struct {
 	Image      string            `yaml:"image,omitempty"`   // OCI image ref (required for kata)
 	Runtime    string            `yaml:"runtime,omitempty"` // "" or "namespace" = Phase 1, "kata" = CRI
 	Network    *NetworkConfig    `yaml:"network,omitempty"` // Network configuration (kata only)
-	TierConfig  *TierConfig       `yaml:"tier,omitempty"`         // Tier-scoped mount configuration
-	Nesting     *NestingConfig    `yaml:"nesting,omitempty"`     // Nesting configuration for recursive containers
-	Permissions *PermissionConfig `yaml:"permissions,omitempty"` // Permission daemon configuration
+	TierConfig     *TierConfig          `yaml:"tier,omitempty"`         // Tier-scoped mount configuration
+	Nesting        *NestingConfig       `yaml:"nesting,omitempty"`     // Nesting configuration for recursive containers
+	Permissions    *PermissionConfig    `yaml:"permissions,omitempty"` // Permission daemon configuration
+	VsockForwarder *VsockForwarderConfig `yaml:"-" json:"-"`            // Runtime-injected vsock config (Kata only)
 }
 
 // NetworkConfig specifies network configuration for CRI containers.
@@ -87,6 +94,12 @@ func (t *TierConfig) Validate() error {
 	}
 
 	return nil
+}
+
+// VsockForwarderConfig holds runtime-injected vsock forwarder settings for Kata containers.
+type VsockForwarderConfig struct {
+	Port   uint32 `yaml:"-" json:"-"` // vsock port on host
+	BinDir string `yaml:"-" json:"-"` // host path to misbah binaries
 }
 
 // PermissionConfig specifies permission daemon configuration for progressive trust.
@@ -229,14 +242,14 @@ func (j *ContainerSpec) Validate() error {
 
 	// Validate runtime
 	switch j.Runtime {
-	case "", "namespace":
+	case "", RuntimeNamespace:
 		// Phase 1 namespace backend, no extra requirements
-	case "kata":
+	case RuntimeKata:
 		if j.Image == "" {
-			return fmt.Errorf("image is required when runtime is \"kata\"")
+			return fmt.Errorf("image is required when runtime is %q", RuntimeKata)
 		}
 	default:
-		return fmt.Errorf("unsupported runtime: %s (must be \"\", \"namespace\", or \"kata\")", j.Runtime)
+		return fmt.Errorf("unsupported runtime: %s (must be %q, %q, or empty)", j.Runtime, RuntimeNamespace, RuntimeKata)
 	}
 
 	// Validate network config (if specified)

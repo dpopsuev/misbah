@@ -307,7 +307,7 @@ func runContainerStart(cmd *cobra.Command, args []string) error {
 
 	logger.Infof("Loaded container specification: %s (runtime=%s)", spec.Metadata.Name, spec.Runtime)
 
-	if spec.Runtime == "kata" {
+	if spec.Runtime == model.RuntimeKata {
 		return startViaDaemon(spec)
 	}
 

@@ -18,6 +18,13 @@ type DaemonConfig struct {
 	Kata        KataSection        `yaml:"kata"`
 	Permissions PermissionsSection `yaml:"permissions"`
 	Network     NetworkSection     `yaml:"network"`
+	Vsock       VsockSection       `yaml:"vsock"`
+}
+
+// VsockSection configures the vsock transport for Kata containers.
+type VsockSection struct {
+	Port   uint32 `yaml:"port"`    // host vsock listen port (default 8118)
+	BinDir string `yaml:"bin_dir"` // host path to misbah binaries
 }
 
 // NetworkSection configures per-container network isolation.
@@ -98,6 +105,10 @@ func DefaultDaemonConfig() *DaemonConfig {
 			Bridge: "misbah0",
 			Subnet: "10.88.0.0/24",
 			MTU:    1500,
+		},
+		Vsock: VsockSection{
+			Port:   DefaultVsockPort,
+			BinDir: DefaultVsockBinDir,
 		},
 	}
 }

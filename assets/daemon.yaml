@@ -24,3 +24,7 @@ network:
   bridge: misbah0
   subnet: 10.88.0.0/24
   mtu: 1500
+
+vsock:
+  port: 8118
+  bin_dir: /usr/local/lib/misbah
