@@ -3,10 +3,13 @@ package metrics
 import (
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog"
 )
+
+var initZerolog sync.Once
 
 // LogLevel represents logging levels.
 type LogLevel string
@@ -30,8 +33,10 @@ func NewLogger(level LogLevel, output io.Writer) *Logger {
 		output = os.Stderr
 	}
 
-	// Configure zerolog
-	zerolog.TimeFieldFormat = time.RFC3339
+	// Configure zerolog globals exactly once (safe for concurrent test goroutines)
+	initZerolog.Do(func() {
+		zerolog.TimeFieldFormat = time.RFC3339
+	})
 
 	// Set log level
 	zlevel := parseLogLevel(level)

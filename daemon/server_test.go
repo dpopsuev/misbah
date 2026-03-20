@@ -32,28 +32,12 @@ func startTestServer(t *testing.T, whitelist *WhitelistStore, prompter Prompter)
 
 	server := NewServer(whitelist, prompter, audit, logger)
 
-	ready := make(chan struct{})
-	go func() {
-		// Remove socket if exists
-		os.Remove(socketPath)
-		ln, err := net.Listen("unix", socketPath)
-		require.NoError(t, err)
-		server.listener = ln
+	os.Remove(socketPath)
+	ln, err := net.Listen("unix", socketPath)
+	require.NoError(t, err)
+	server.listener = ln
 
-		mux := http.NewServeMux()
-		mux.HandleFunc("/permission/request", server.handleRequest)
-		mux.HandleFunc("/permission/check", server.handleCheck)
-		mux.HandleFunc("/permission/list", server.handleList)
-		mux.HandleFunc("/container/start", server.handleContainerStart)
-		mux.HandleFunc("/container/stop", server.handleContainerStop)
-		mux.HandleFunc("/container/destroy", server.handleContainerDestroy)
-		mux.HandleFunc("/whitelist/load", server.handleWhitelistLoad)
-
-		server.httpServer = &http.Server{Handler: mux}
-		close(ready)
-		server.httpServer.Serve(ln)
-	}()
-	<-ready
+	go server.httpServer.Serve(ln)
 
 	client := &http.Client{
 		Transport: &http.Transport{
