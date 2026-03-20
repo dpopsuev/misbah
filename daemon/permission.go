@@ -1,34 +1,21 @@
 package daemon
 
-// ResourceType identifies what kind of resource is being requested.
-type ResourceType string
+import "github.com/dpopsuev/misbah/proxy"
+
+// Re-export permission types from proxy/ for backward compatibility
+// within the daemon package. These types are canonical in proxy/.
+type ResourceType = proxy.ResourceType
+type Decision = proxy.Decision
+type PermissionRequest = proxy.PermissionRequest
+type PermissionResponse = proxy.PermissionResponse
 
 const (
-	ResourceNetwork ResourceType = "network"
-	ResourceMCP     ResourceType = "mcp"
-	ResourcePackage ResourceType = "package"
+	ResourceNetwork = proxy.ResourceNetwork
+	ResourceMCP     = proxy.ResourceMCP
+	ResourcePackage = proxy.ResourcePackage
+
+	DecisionDeny    = proxy.DecisionDeny
+	DecisionOnce    = proxy.DecisionOnce
+	DecisionAlways  = proxy.DecisionAlways
+	DecisionUnknown = proxy.DecisionUnknown
 )
-
-// Decision represents the user's permission response.
-type Decision string
-
-const (
-	DecisionDeny    Decision = "deny"
-	DecisionOnce    Decision = "once"
-	DecisionAlways  Decision = "always"
-	DecisionUnknown Decision = "unknown"
-)
-
-// PermissionRequest is sent by a proxy when it encounters an unknown resource.
-type PermissionRequest struct {
-	Container    string       `json:"container"`
-	ResourceType ResourceType `json:"resource_type"`
-	ResourceID   string       `json:"resource_id"`
-	Description  string       `json:"description"`
-}
-
-// PermissionResponse is the daemon's answer.
-type PermissionResponse struct {
-	Decision Decision `json:"decision"`
-	Reason   string   `json:"reason,omitempty"`
-}

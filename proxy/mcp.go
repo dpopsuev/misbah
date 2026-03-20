@@ -12,7 +12,6 @@ import (
 	"path"
 	"sync"
 
-	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/metrics"
 )
 
@@ -44,7 +43,7 @@ type mcpError struct {
 
 // MCPProxy intercepts MCP tool calls and checks permissions before forwarding.
 type MCPProxy struct {
-	client     *daemon.Client
+	checker    PermissionChecker
 	container  string
 	listenAddr string
 	upstream   *url.URL // real MCP server
@@ -52,21 +51,21 @@ type MCPProxy struct {
 	httpServer *http.Server
 
 	mu    sync.RWMutex
-	cache map[string]daemon.Decision
+	cache map[string]Decision
 }
 
 // NewMCPProxy creates a new MCP proxy.
-func NewMCPProxy(client *daemon.Client, container, listenAddr string, upstream *url.URL, logger *metrics.Logger) *MCPProxy {
+func NewMCPProxy(checker PermissionChecker, container, listenAddr string, upstream *url.URL, logger *metrics.Logger) *MCPProxy {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
 	return &MCPProxy{
-		client:     client,
+		checker:    checker,
 		container:  container,
 		listenAddr: listenAddr,
 		upstream:   upstream,
 		logger:     logger,
-		cache:      make(map[string]daemon.Decision),
+		cache:      make(map[string]Decision),
 	}
 }
 
@@ -134,7 +133,7 @@ func (p *MCPProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if decision != daemon.DecisionAlways && decision != daemon.DecisionOnce {
+		if decision != DecisionAlways && decision != DecisionOnce {
 			p.logger.Infof("Blocked MCP tool call: %s (%s)", call.Name, decision)
 			p.writeError(w, req.ID, -32603, fmt.Sprintf("access denied: tool %q is not permitted", call.Name))
 			return
@@ -170,7 +169,7 @@ func (p *MCPProxy) forward(w http.ResponseWriter, originalReq *http.Request, bod
 }
 
 // checkPermission checks if an MCP tool is allowed.
-func (p *MCPProxy) checkPermission(ctx context.Context, toolName string) (daemon.Decision, error) {
+func (p *MCPProxy) checkPermission(ctx context.Context, toolName string) (Decision, error) {
 	p.mu.RLock()
 	if d, ok := p.cache[toolName]; ok {
 		p.mu.RUnlock()
@@ -178,31 +177,31 @@ func (p *MCPProxy) checkPermission(ctx context.Context, toolName string) (daemon
 	}
 	p.mu.RUnlock()
 
-	req := daemon.PermissionRequest{
+	req := PermissionRequest{
 		Container:    p.container,
-		ResourceType: daemon.ResourceMCP,
+		ResourceType: ResourceMCP,
 		ResourceID:   toolName,
 		Description:  fmt.Sprintf("MCP tool call: %s", toolName),
 	}
 
-	resp, err := p.client.Check(ctx, req)
+	resp, err := p.checker.Check(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		p.mu.Lock()
 		p.cache[toolName] = resp.Decision
 		p.mu.Unlock()
 		return resp.Decision, nil
 	}
 
-	resp, err = p.client.Request(ctx, req)
+	resp, err = p.checker.Request(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		p.mu.Lock()
 		p.cache[toolName] = resp.Decision
 		p.mu.Unlock()

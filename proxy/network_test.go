@@ -9,13 +9,9 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
-	"path/filepath"
 	"strings"
-	"sync/atomic"
 	"testing"
-	"time"
 
-	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,34 +21,15 @@ func testLogger() *metrics.Logger {
 	return metrics.NewLogger(metrics.LogLevelDebug, os.Stderr)
 }
 
-// testSetup creates a daemon server, daemon client, and network proxy.
-// Returns the proxy, an http.Client configured to use it, and the proxy address.
-func testSetup(t *testing.T, whitelist *daemon.WhitelistStore, prompter daemon.Prompter) (*NetworkProxy, *http.Client, string) {
+// testSetup creates a mock checker and network proxy.
+func testSetup(t *testing.T, checker PermissionChecker) (*NetworkProxy, *http.Client, string) {
 	t.Helper()
-
-	socketPath := filepath.Join(t.TempDir(), "daemon.sock")
-	logger := testLogger()
-
-	audit := daemon.NewAuditLoggerFromWriter(io.Discard, logger)
-	daemonServer := daemon.NewServer(whitelist, prompter, audit, logger)
-
-	daemonReady := make(chan struct{})
-	go func() {
-		close(daemonReady)
-		daemonServer.Start(socketPath)
-	}()
-	<-daemonReady
-	time.Sleep(10 * time.Millisecond)
-	t.Cleanup(func() { daemonServer.Stop() })
-
-	daemonClient := daemon.NewClient(socketPath, logger)
-	t.Cleanup(func() { daemonClient.Close() })
 
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 
 	proxyAddr := ln.Addr().String()
-	p := NewNetworkProxy(daemonClient, "test-container", proxyAddr, logger)
+	p := NewNetworkProxy(checker, "test-container", proxyAddr, testLogger())
 	p.httpServer = &http.Server{Handler: p}
 
 	go func() { p.httpServer.Serve(ln) }()
@@ -75,11 +52,10 @@ func TestHTTPProxy_AllowedDomain(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
 	upstreamURL, _ := url.Parse(upstream.URL)
-	whitelist.Set(daemon.ResourceNetwork, extractDomain(upstreamURL.Host), daemon.DecisionAlways)
+	checker := newMockChecker().withWhitelist(ResourceNetwork, extractDomain(upstreamURL.Host), DecisionAlways)
 
-	_, client, _ := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	_, client, _ := testSetup(t, checker)
 
 	resp, err := client.Get(upstream.URL + "/test")
 	require.NoError(t, err)
@@ -96,8 +72,9 @@ func TestHTTPProxy_DeniedDomain(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	_, client, _ := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	checker := newMockChecker() // empty whitelist, auto-deny prompter
+
+	_, client, _ := testSetup(t, checker)
 
 	resp, err := client.Get(upstream.URL + "/test")
 	require.NoError(t, err)
@@ -112,8 +89,9 @@ func TestCONNECT_DeniedDomain(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	_, client, _ := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	checker := newMockChecker()
+
+	_, client, _ := testSetup(t, checker)
 
 	_, err := client.Get(upstream.URL + "/test")
 	assert.Error(t, err)
@@ -126,11 +104,10 @@ func TestCONNECT_AllowedDomain(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
 	upstreamURL, _ := url.Parse(upstream.URL)
-	whitelist.Set(daemon.ResourceNetwork, extractDomain(upstreamURL.Host), daemon.DecisionAlways)
+	checker := newMockChecker().withWhitelist(ResourceNetwork, extractDomain(upstreamURL.Host), DecisionAlways)
 
-	_, _, proxyAddr := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	_, _, proxyAddr := testSetup(t, checker)
 
 	proxyURL, _ := url.Parse("http://" + proxyAddr)
 	tlsConfig := upstream.Client().Transport.(*http.Transport).TLSClientConfig
@@ -151,16 +128,15 @@ func TestCONNECT_AllowedDomain(t *testing.T) {
 }
 
 func TestPermissionCaching(t *testing.T) {
-	var count atomic.Int32
-	prompter := &countingFixedPrompter{decision: daemon.DecisionAlways, count: &count}
+	cp := newCountingPrompter(DecisionAlways)
+	checker := newMockChecker().withPrompter(cp.prompt)
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	_, client, _ := testSetup(t, whitelist, prompter)
+	_, client, _ := testSetup(t, checker)
 
 	resp, err := client.Get(upstream.URL + "/first")
 	require.NoError(t, err)
@@ -172,21 +148,19 @@ func TestPermissionCaching(t *testing.T) {
 	resp2.Body.Close()
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 
-	// Prompter only called once — second request was cached
-	assert.Equal(t, int32(1), count.Load())
+	assert.Equal(t, int32(1), cp.count.Load())
 }
 
 func TestPermissionOnce_NotCached(t *testing.T) {
-	var count atomic.Int32
-	prompter := &countingFixedPrompter{decision: daemon.DecisionOnce, count: &count}
+	cp := newCountingPrompter(DecisionOnce)
+	checker := newMockChecker().withPrompter(cp.prompt)
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	_, client, _ := testSetup(t, whitelist, prompter)
+	_, client, _ := testSetup(t, checker)
 
 	resp, err := client.Get(upstream.URL + "/first")
 	require.NoError(t, err)
@@ -196,8 +170,7 @@ func TestPermissionOnce_NotCached(t *testing.T) {
 	require.NoError(t, err)
 	resp2.Body.Close()
 
-	// Prompter called twice — Once is not cached
-	assert.Equal(t, int32(2), count.Load())
+	assert.Equal(t, int32(2), cp.count.Load())
 }
 
 func TestExtractDomain(t *testing.T) {
@@ -241,11 +214,10 @@ func TestHTTPProxy_HopByHopHeaders(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
 	upstreamURL, _ := url.Parse(upstream.URL)
-	whitelist.Set(daemon.ResourceNetwork, extractDomain(upstreamURL.Host), daemon.DecisionAlways)
+	checker := newMockChecker().withWhitelist(ResourceNetwork, extractDomain(upstreamURL.Host), DecisionAlways)
 
-	_, client, _ := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	_, client, _ := testSetup(t, checker)
 
 	req, _ := http.NewRequest("GET", upstream.URL+"/test", nil)
 	req.Header.Set("Proxy-Authorization", "secret")
@@ -270,11 +242,10 @@ func TestHTTPProxy_PreservesRequestBody(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
 	upstreamURL, _ := url.Parse(upstream.URL)
-	whitelist.Set(daemon.ResourceNetwork, extractDomain(upstreamURL.Host), daemon.DecisionAlways)
+	checker := newMockChecker().withWhitelist(ResourceNetwork, extractDomain(upstreamURL.Host), DecisionAlways)
 
-	_, client, _ := testSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	_, client, _ := testSetup(t, checker)
 
 	payload := `{"key": "value"}`
 	resp, err := client.Post(upstream.URL+"/data", "application/json", strings.NewReader(payload))
@@ -283,15 +254,4 @@ func TestHTTPProxy_PreservesRequestBody(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, payload, receivedBody)
-}
-
-// countingFixedPrompter returns a fixed decision and counts calls.
-type countingFixedPrompter struct {
-	decision daemon.Decision
-	count    *atomic.Int32
-}
-
-func (c *countingFixedPrompter) Prompt(req *daemon.PermissionRequest) (daemon.Decision, error) {
-	c.count.Add(1)
-	return c.decision, nil
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/metrics"
 )
 
@@ -23,24 +22,24 @@ const (
 
 // PackageWrapper intercepts package manager commands and checks permissions.
 type PackageWrapper struct {
-	client    *daemon.Client
+	checker   PermissionChecker
 	container string
 	logger    *metrics.Logger
 
 	mu    sync.RWMutex
-	cache map[string]daemon.Decision
+	cache map[string]Decision
 }
 
 // NewPackageWrapper creates a new package wrapper.
-func NewPackageWrapper(client *daemon.Client, container string, logger *metrics.Logger) *PackageWrapper {
+func NewPackageWrapper(checker PermissionChecker, container string, logger *metrics.Logger) *PackageWrapper {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
 	return &PackageWrapper{
-		client:    client,
+		checker:   checker,
 		container: container,
 		logger:    logger,
-		cache:     make(map[string]daemon.Decision),
+		cache:     make(map[string]Decision),
 	}
 }
 
@@ -62,7 +61,7 @@ func (pw *PackageWrapper) Wrap(ctx context.Context, pm PackageManager, realBinar
 			return 1
 		}
 
-		if decision != daemon.DecisionAlways && decision != daemon.DecisionOnce {
+		if decision != DecisionAlways && decision != DecisionOnce {
 			fmt.Fprintf(os.Stderr, "misbah: package %q denied by permission policy\n", pkg)
 			return 1
 		}
@@ -72,7 +71,7 @@ func (pw *PackageWrapper) Wrap(ctx context.Context, pm PackageManager, realBinar
 	return pw.exec(realBinary, args)
 }
 
-func (pw *PackageWrapper) checkPermission(ctx context.Context, pkg string) (daemon.Decision, error) {
+func (pw *PackageWrapper) checkPermission(ctx context.Context, pkg string) (Decision, error) {
 	pw.mu.RLock()
 	if d, ok := pw.cache[pkg]; ok {
 		pw.mu.RUnlock()
@@ -80,31 +79,31 @@ func (pw *PackageWrapper) checkPermission(ctx context.Context, pkg string) (daem
 	}
 	pw.mu.RUnlock()
 
-	req := daemon.PermissionRequest{
+	req := PermissionRequest{
 		Container:    pw.container,
-		ResourceType: daemon.ResourcePackage,
+		ResourceType: ResourcePackage,
 		ResourceID:   pkg,
 		Description:  fmt.Sprintf("Install package: %s", pkg),
 	}
 
-	resp, err := pw.client.Check(ctx, req)
+	resp, err := pw.checker.Check(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		pw.mu.Lock()
 		pw.cache[pkg] = resp.Decision
 		pw.mu.Unlock()
 		return resp.Decision, nil
 	}
 
-	resp, err = pw.client.Request(ctx, req)
+	resp, err = pw.checker.Request(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		pw.mu.Lock()
 		pw.cache[pkg] = resp.Decision
 		pw.mu.Unlock()

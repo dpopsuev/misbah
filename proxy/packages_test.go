@@ -2,14 +2,8 @@ package proxy
 
 import (
 	"context"
-	"io"
-	"net"
-	"path/filepath"
-	"sync/atomic"
 	"testing"
-	"time"
 
-	"github.com/dpopsuev/misbah/daemon"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -119,59 +113,28 @@ func TestStripPipVersion(t *testing.T) {
 	}
 }
 
-func pkgTestSetup(t *testing.T, whitelist *daemon.WhitelistStore, prompter daemon.Prompter) *PackageWrapper {
-	t.Helper()
-
-	socketPath := filepath.Join(t.TempDir(), "daemon.sock")
-	logger := testLogger()
-	audit := daemon.NewAuditLoggerFromWriter(io.Discard, logger)
-	daemonServer := daemon.NewServer(whitelist, prompter, audit, logger)
-
-	daemonReady := make(chan struct{})
-	go func() {
-		close(daemonReady)
-		daemonServer.Start(socketPath)
-	}()
-	<-daemonReady
-	time.Sleep(10 * time.Millisecond)
-	t.Cleanup(func() { daemonServer.Stop() })
-
-	daemonClient := daemon.NewClient(socketPath, logger)
-	t.Cleanup(func() { daemonClient.Close() })
-
-	return NewPackageWrapper(daemonClient, "test-container", logger)
-}
-
 func TestPackageWrapper_AllowedPackage(t *testing.T) {
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	whitelist.Set(daemon.ResourcePackage, "true", daemon.DecisionAlways) // "true" is a real binary
+	checker := newMockChecker().withWhitelist(ResourcePackage, "true", DecisionAlways)
+	pw := NewPackageWrapper(checker, "test-container", testLogger())
 
-	pw := pkgTestSetup(t, whitelist, &daemon.AutoDenyPrompter{})
-
-	// Wrap "true" which is a no-op binary that always exits 0
-	// We use "install" as a subcommand to trigger package extraction
-	// But since we're testing the wrapper's permission check, we need packages in args
-	// Using a synthetic test: check permission for "true", then exec "/bin/true"
 	decision, err := pw.checkPermission(context.Background(), "true")
 	require.NoError(t, err)
-	assert.Equal(t, daemon.DecisionAlways, decision)
+	assert.Equal(t, DecisionAlways, decision)
 }
 
 func TestPackageWrapper_DeniedPackage(t *testing.T) {
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	pw := pkgTestSetup(t, whitelist, &daemon.AutoDenyPrompter{})
+	checker := newMockChecker()
+	pw := NewPackageWrapper(checker, "test-container", testLogger())
 
 	decision, err := pw.checkPermission(context.Background(), "malware-pkg")
 	require.NoError(t, err)
-	assert.Equal(t, daemon.DecisionDeny, decision)
+	assert.Equal(t, DecisionDeny, decision)
 }
 
 func TestPackageWrapper_Caching(t *testing.T) {
-	var count atomic.Int32
-	prompter := &countingFixedPrompter{decision: daemon.DecisionAlways, count: &count}
-
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	pw := pkgTestSetup(t, whitelist, prompter)
+	cp := newCountingPrompter(DecisionAlways)
+	checker := newMockChecker().withPrompter(cp.prompt)
+	pw := NewPackageWrapper(checker, "test-container", testLogger())
 
 	_, err := pw.checkPermission(context.Background(), "numpy")
 	require.NoError(t, err)
@@ -179,16 +142,13 @@ func TestPackageWrapper_Caching(t *testing.T) {
 	_, err = pw.checkPermission(context.Background(), "numpy")
 	require.NoError(t, err)
 
-	// Only prompted once
-	assert.Equal(t, int32(1), count.Load())
+	assert.Equal(t, int32(1), cp.count.Load())
 }
 
 func TestPackageWrapper_OnceNotCached(t *testing.T) {
-	var count atomic.Int32
-	prompter := &countingFixedPrompter{decision: daemon.DecisionOnce, count: &count}
-
-	whitelist := daemon.NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
-	pw := pkgTestSetup(t, whitelist, prompter)
+	cp := newCountingPrompter(DecisionOnce)
+	checker := newMockChecker().withPrompter(cp.prompt)
+	pw := NewPackageWrapper(checker, "test-container", testLogger())
 
 	_, err := pw.checkPermission(context.Background(), "numpy")
 	require.NoError(t, err)
@@ -196,19 +156,7 @@ func TestPackageWrapper_OnceNotCached(t *testing.T) {
 	_, err = pw.checkPermission(context.Background(), "numpy")
 	require.NoError(t, err)
 
-	// Prompted twice
-	assert.Equal(t, int32(2), count.Load())
-}
-
-func TestPackageWrapper_InvalidSocket(t *testing.T) {
-	logger := testLogger()
-	client := daemon.NewClient("/tmp/nonexistent.sock", logger)
-	defer client.Close()
-
-	pw := NewPackageWrapper(client, "test", logger)
-
-	_, err := pw.checkPermission(context.Background(), "numpy")
-	assert.Error(t, err)
+	assert.Equal(t, int32(2), cp.count.Load())
 }
 
 func TestWrapperScript(t *testing.T) {
@@ -219,6 +167,3 @@ func TestWrapperScript(t *testing.T) {
 	assert.Contains(t, script, "MISBAH_CONTAINER=\"agent-main\"")
 	assert.Contains(t, script, "misbah-pkg-check pip /usr/bin/pip3")
 }
-
-// Need net import for the daemon setup
-var _ = net.Listen

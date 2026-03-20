@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/metrics"
 )
 
@@ -31,27 +30,27 @@ var hopByHopHeaders = []string{
 
 // NetworkProxy is an HTTP/HTTPS forward proxy with permission checking.
 type NetworkProxy struct {
-	client     *daemon.Client
+	checker    PermissionChecker
 	container  string
 	listenAddr string
 	logger     *metrics.Logger
 	httpServer *http.Server
 
 	mu    sync.RWMutex
-	cache map[string]daemon.Decision
+	cache map[string]Decision
 }
 
 // NewNetworkProxy creates a new network proxy.
-func NewNetworkProxy(client *daemon.Client, container, listenAddr string, logger *metrics.Logger) *NetworkProxy {
+func NewNetworkProxy(checker PermissionChecker, container, listenAddr string, logger *metrics.Logger) *NetworkProxy {
 	if logger == nil {
 		logger = metrics.GetDefaultLogger()
 	}
 	return &NetworkProxy{
-		client:     client,
+		checker:    checker,
 		container:  container,
 		listenAddr: listenAddr,
 		logger:     logger,
-		cache:      make(map[string]daemon.Decision),
+		cache:      make(map[string]Decision),
 	}
 }
 
@@ -102,7 +101,7 @@ func (p *NetworkProxy) handleHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if decision != daemon.DecisionAlways && decision != daemon.DecisionOnce {
+	if decision != DecisionAlways && decision != DecisionOnce {
 		p.logger.Infof("Blocked HTTP request to %s: %s", domain, decision)
 		http.Error(w, fmt.Sprintf(`{"error":"access denied","domain":%q}`, domain), http.StatusForbidden)
 		return
@@ -154,7 +153,7 @@ func (p *NetworkProxy) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if decision != daemon.DecisionAlways && decision != daemon.DecisionOnce {
+	if decision != DecisionAlways && decision != DecisionOnce {
 		p.logger.Infof("Blocked CONNECT to %s: %s", domain, decision)
 		http.Error(w, "access denied", http.StatusForbidden)
 		return
@@ -204,7 +203,7 @@ func (p *NetworkProxy) handleCONNECT(w http.ResponseWriter, r *http.Request) {
 
 // checkPermission checks if a domain is allowed.
 // Uses local cache first, then calls daemon.
-func (p *NetworkProxy) checkPermission(ctx context.Context, domain string) (daemon.Decision, error) {
+func (p *NetworkProxy) checkPermission(ctx context.Context, domain string) (Decision, error) {
 	// Check local session cache
 	p.mu.RLock()
 	if d, ok := p.cache[domain]; ok {
@@ -214,19 +213,19 @@ func (p *NetworkProxy) checkPermission(ctx context.Context, domain string) (daem
 	p.mu.RUnlock()
 
 	// Fast path: check whitelist
-	req := daemon.PermissionRequest{
+	req := PermissionRequest{
 		Container:    p.container,
-		ResourceType: daemon.ResourceNetwork,
+		ResourceType: ResourceNetwork,
 		ResourceID:   domain,
 		Description:  fmt.Sprintf("Network access to %s", domain),
 	}
 
-	resp, err := p.client.Check(ctx, req)
+	resp, err := p.checker.Check(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		p.mu.Lock()
 		p.cache[domain] = resp.Decision
 		p.mu.Unlock()
@@ -234,13 +233,13 @@ func (p *NetworkProxy) checkPermission(ctx context.Context, domain string) (daem
 	}
 
 	// Full flow: prompt user
-	resp, err = p.client.Request(ctx, req)
+	resp, err = p.checker.Request(ctx, req)
 	if err != nil {
-		return daemon.DecisionDeny, err
+		return DecisionDeny, err
 	}
 
 	// Cache always/deny decisions; once is NOT cached
-	if resp.Decision == daemon.DecisionAlways || resp.Decision == daemon.DecisionDeny {
+	if resp.Decision == DecisionAlways || resp.Decision == DecisionDeny {
 		p.mu.Lock()
 		p.cache[domain] = resp.Decision
 		p.mu.Unlock()
