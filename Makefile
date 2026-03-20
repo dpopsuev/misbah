@@ -15,19 +15,17 @@ build:
 	@echo "Building $(BINARY_NAME)..."
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/misbah
-	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-proxy ./cmd/misbah-proxy
+	$(GO) build $(GOFLAGS) $(LDFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME)-vsock-fwd ./cmd/misbah-vsock-fwd
 
 ## install: Install misbah to $GOPATH/bin
 install:
 	@echo "Installing $(BINARY_NAME)..."
 	$(GO) install $(LDFLAGS) ./cmd/misbah
-	$(GO) install $(LDFLAGS) ./cmd/misbah-proxy
 
 ## install-system: Install binaries, systemd unit, and default config (run as root)
 install-system: build
 	@echo "Installing system-wide..."
 	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)
-	install -Dm755 $(BUILD_DIR)/$(BINARY_NAME)-proxy /usr/local/bin/$(BINARY_NAME)-proxy
 	install -Dm644 assets/misbah-daemon.service /etc/systemd/system/misbah-daemon.service
 	install -dm755 /etc/misbah
 	@test -f /etc/misbah/daemon.yaml || install -Dm644 assets/daemon.yaml /etc/misbah/daemon.yaml
@@ -43,7 +41,7 @@ uninstall-system:
 	@echo "Uninstalling..."
 	systemctl stop misbah-daemon 2>/dev/null || true
 	systemctl disable misbah-daemon 2>/dev/null || true
-	rm -f /usr/local/bin/$(BINARY_NAME) /usr/local/bin/$(BINARY_NAME)-proxy
+	rm -f /usr/local/bin/$(BINARY_NAME)
 	rm -f /etc/systemd/system/misbah-daemon.service
 	systemctl daemon-reload
 	@echo "Uninstalled. Config at /etc/misbah/ preserved."

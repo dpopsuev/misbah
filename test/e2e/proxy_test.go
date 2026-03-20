@@ -15,15 +15,10 @@ import (
 )
 
 // TestProgressiveTrustFlow tests the full progressive trust vertical slice:
-// container starts → proxy runs → HTTP request blocked → permission denied → 403
+// container starts → proxy runs on host → HTTP request blocked → permission denied → 403
 func TestProgressiveTrustFlow(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
-	}
-
-	// Skip if daemon socket doesn't exist (daemon not running)
-	if _, err := os.Stat("/run/misbah/permission.sock"); err != nil {
-		t.Skip("Misbah daemon not running (no socket at /run/misbah/permission.sock)")
 	}
 
 	lab := harness.NewLab(t)
@@ -32,7 +27,7 @@ func TestProgressiveTrustFlow(t *testing.T) {
 	containerName := "e2e-proxy-" + time.Now().Format("20060102-150405")
 	specFile := filepath.Join(testDir, "proxy-test.yaml")
 
-	// Create spec that checks proxy environment and makes an HTTP request
+	// Create spec with permissions to trigger proxy startup
 	spec := `version: "1.0"
 metadata:
   name: ` + containerName + `
@@ -48,13 +43,6 @@ process:
         exit 1
       fi
       echo "PASS: HTTP_PROXY=$HTTP_PROXY"
-
-      # Verify daemon socket is mounted
-      if [ ! -S /run/misbah/permission.sock ]; then
-        echo "FAIL: daemon socket not mounted"
-        exit 1
-      fi
-      echo "PASS: daemon socket mounted"
 
       # Make HTTP request through proxy — should be denied (403)
       HTTP_CODE=$(curl -s --connect-timeout 5 -o /dev/null -w "%{http_code}" http://example.com 2>/dev/null)
@@ -76,6 +64,8 @@ mounts:
     destination: /tmp
     options:
       - rw
+permissions:
+  default_policy: deny
 `
 	require.NoError(t, os.WriteFile(specFile, []byte(spec), 0644))
 
@@ -84,7 +74,6 @@ mounts:
 		require.NoError(t, err, "container start failed: %s", output)
 
 		require.Contains(t, output, "PASS: HTTP_PROXY=")
-		require.Contains(t, output, "PASS: daemon socket mounted")
 		require.Contains(t, output, "PASS: HTTP request denied (403)")
 		require.Contains(t, output, "ALL CHECKS PASSED")
 	})
@@ -96,10 +85,6 @@ mounts:
 func TestProxyWithWhitelist(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
-	}
-
-	if _, err := os.Stat("/run/misbah/permission.sock"); err != nil {
-		t.Skip("Misbah daemon not running")
 	}
 
 	lab := harness.NewLab(t)
@@ -147,21 +132,17 @@ permissions:
 	})
 }
 
-// TestContainerWithoutDaemon verifies namespace containers work without the daemon.
-func TestContainerWithoutDaemon(t *testing.T) {
+// TestContainerWithoutProxy verifies namespace containers work without permissions (no proxy).
+func TestContainerWithoutProxy(t *testing.T) {
 	if runtime.GOOS != "linux" {
 		t.Skip("E2E tests require Linux")
 	}
 
 	lab := harness.NewLab(t)
 
-	// Override daemon socket to a path that doesn't exist
-	// This simulates no daemon running
-	t.Setenv("MISBAH_DAEMON_SOCKET", "/tmp/nonexistent-daemon.sock")
-
 	testDir := t.TempDir()
-	containerName := "e2e-nodaemon-" + time.Now().Format("20060102-150405")
-	specFile := filepath.Join(testDir, "nodaemon-test.yaml")
+	containerName := "e2e-noproxy-" + time.Now().Format("20060102-150405")
+	specFile := filepath.Join(testDir, "noproxy-test.yaml")
 
 	spec := `version: "1.0"
 metadata:
@@ -171,7 +152,7 @@ process:
   command:
     - /bin/sh
     - -c
-    - echo "hello without daemon" && echo "proxy=${HTTP_PROXY:-NONE}"
+    - echo "hello without proxy" && echo "proxy=${HTTP_PROXY:-NONE}"
   cwd: /tmp
 namespaces:
   user: true
@@ -189,7 +170,7 @@ mounts:
 		output, err := lab.RunMisbah("container", "start", "--spec", specFile)
 		require.NoError(t, err, "container start failed: %s", output)
 
-		require.True(t, strings.Contains(output, "hello without daemon"))
+		require.True(t, strings.Contains(output, "hello without proxy"))
 		require.True(t, strings.Contains(output, "proxy=NONE"))
 	})
 }

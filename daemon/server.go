@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/dpopsuev/misbah/metrics"
+	"github.com/dpopsuev/misbah/proxy"
 )
 
 // Server is the unified daemon HTTP server on a Unix socket.
@@ -21,6 +22,7 @@ type Server struct {
 	audit      *AuditLogger
 	logger     *metrics.Logger
 	lifecycle  ContainerLifecycle
+	proxyMgr   *ProxyManager
 	listener   net.Listener
 	httpServer *http.Server
 }
@@ -32,6 +34,13 @@ type ServerOption func(*Server)
 func WithLifecycle(lc ContainerLifecycle) ServerOption {
 	return func(s *Server) {
 		s.lifecycle = lc
+	}
+}
+
+// WithProxyManager enables per-container proxy management.
+func WithProxyManager(pm *ProxyManager) ServerOption {
+	return func(s *Server) {
+		s.proxyMgr = pm
 	}
 }
 
@@ -49,6 +58,17 @@ func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger,
 	for _, opt := range opts {
 		opt(s)
 	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/permission/request", s.handleRequest)
+	mux.HandleFunc("/permission/check", s.handleCheck)
+	mux.HandleFunc("/permission/list", s.handleList)
+	mux.HandleFunc("/container/start", s.handleContainerStart)
+	mux.HandleFunc("/container/stop", s.handleContainerStop)
+	mux.HandleFunc("/container/destroy", s.handleContainerDestroy)
+	mux.HandleFunc("/whitelist/load", s.handleWhitelistLoad)
+	s.httpServer = &http.Server{Handler: mux}
+
 	return s
 }
 
@@ -77,17 +97,6 @@ func (s *Server) Start(socketPath string) error {
 		s.logger.Warnf("Socket group setup: %v (falling back to root-only access)", err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/permission/request", s.handleRequest)
-	mux.HandleFunc("/permission/check", s.handleCheck)
-	mux.HandleFunc("/permission/list", s.handleList)
-	mux.HandleFunc("/container/start", s.handleContainerStart)
-	mux.HandleFunc("/container/stop", s.handleContainerStop)
-	mux.HandleFunc("/container/destroy", s.handleContainerDestroy)
-	mux.HandleFunc("/whitelist/load", s.handleWhitelistLoad)
-
-	s.httpServer = &http.Server{Handler: mux}
-
 	s.logger.Infof("Permission daemon listening on %s", socketPath)
 
 	if err := s.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
@@ -99,6 +108,9 @@ func (s *Server) Start(socketPath string) error {
 
 // Stop gracefully shuts down the server.
 func (s *Server) Stop() error {
+	if s.proxyMgr != nil {
+		s.proxyMgr.StopAll()
+	}
 	if s.httpServer != nil {
 		s.logger.Infof("Shutting down permission daemon")
 		return s.httpServer.Shutdown(context.Background())
@@ -280,12 +292,26 @@ func (s *Server) handleContainerStart(w http.ResponseWriter, r *http.Request) {
 	name := req.Spec.Metadata.Name
 	s.logger.Infof("Starting container via daemon: %s", name)
 
+	// Start proxy for this container (if proxy manager configured)
+	if s.proxyMgr != nil {
+		proxyAddr, proxyErr := s.proxyMgr.Start(name)
+		if proxyErr != nil {
+			s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("proxy start failed: %v", proxyErr))
+			return
+		}
+		socketPath := s.listener.Addr().String()
+		req.Spec.Process.Env = append(req.Spec.Process.Env, proxy.ProxyEnvVars(proxyAddr, socketPath)...)
+	}
+
 	// Start in a goroutine — lifecycle.Start blocks until the container exits
 	go func() {
 		if err := s.lifecycle.Start(req.Spec); err != nil {
 			s.logger.Errorf("Container %s failed: %v", name, err)
 		} else {
 			s.logger.Infof("Container %s exited successfully", name)
+		}
+		if s.proxyMgr != nil {
+			s.proxyMgr.Stop(name)
 		}
 	}()
 

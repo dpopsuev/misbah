@@ -9,6 +9,7 @@ import (
 	"github.com/dpopsuev/misbah/config"
 	"github.com/dpopsuev/misbah/daemon"
 	"github.com/dpopsuev/misbah/model"
+	"github.com/dpopsuev/misbah/proxy"
 	"github.com/dpopsuev/misbah/runtime"
 	"github.com/spf13/cobra"
 )
@@ -310,14 +311,45 @@ func runContainerStart(cmd *cobra.Command, args []string) error {
 		return startViaDaemon(spec)
 	}
 
-	// Pre-load spec whitelist into daemon (if running)
+	// Namespace path: in-process proxy if permissions configured
 	if spec.Permissions != nil {
-		socketPath := config.GetDaemonSocket()
-		client := daemon.NewClient(socketPath, logger)
-		if err := client.WhitelistLoad(context.Background(), spec); err != nil {
-			logger.Debugf("Could not load whitelist into daemon: %v", err)
+		tmpDir, tmpErr := os.MkdirTemp("", "misbah-proxy-")
+		if tmpErr != nil {
+			return fmt.Errorf("failed to create temp dir: %w", tmpErr)
 		}
-		client.Close()
+		defer os.RemoveAll(tmpDir)
+
+		whitelist := daemon.NewWhitelistStore(filepath.Join(tmpDir, "wl.yaml"), logger)
+		whitelist.LoadFromSpec(spec)
+
+		checker := daemon.NewDirectChecker(whitelist, &daemon.AutoDenyPrompter{}, nil, logger)
+
+		// Try kernel-enforced network isolation (requires CAP_NET_ADMIN)
+		var isolator *daemon.NetworkIsolator
+		if os.Geteuid() == 0 {
+			daemonCfg, cfgErr := config.LoadDaemonConfig("")
+			if cfgErr == nil {
+				isolator = daemon.NewNetworkIsolator(daemonCfg.Network, logger)
+			}
+		}
+
+		pm := daemon.NewProxyManager(checker, logger, isolator)
+		defer pm.StopAll()
+
+		proxyAddr, proxyErr := pm.Start(spec.Metadata.Name)
+		if proxyErr != nil {
+			return fmt.Errorf("failed to start proxy: %w", proxyErr)
+		}
+
+		socketPath := config.GetDaemonSocket()
+		spec.Process.Env = append(spec.Process.Env, proxy.ProxyEnvVars(proxyAddr, socketPath)...)
+
+		// If network isolation is active, tell the namespace backend to use the pre-created netns
+		if isolator != nil {
+			if nsName := isolator.NsName(spec.Metadata.Name); nsName != "" {
+				spec.Process.NetNsName = nsName
+			}
+		}
 	}
 
 	// Direct: namespace backend (daemonless)

@@ -257,6 +257,16 @@ func extractDomain(hostport string) string {
 	return host
 }
 
+// StartOnListener begins serving proxy requests on a pre-created listener.
+func (p *NetworkProxy) StartOnListener(ln net.Listener) error {
+	p.httpServer = &http.Server{Handler: p}
+	p.logger.Infof("Network proxy listening on %s", ln.Addr().String())
+	if err := p.httpServer.Serve(ln); err != nil && err != http.ErrServerClosed {
+		return fmt.Errorf("proxy server error: %w", err)
+	}
+	return nil
+}
+
 // ProxyEnvVars returns the environment variables to set inside the container
 // for routing traffic through the network proxy.
 func ProxyEnvVars(proxyAddr, daemonSocketPath string) []string {

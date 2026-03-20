@@ -45,7 +45,7 @@ User (unprivileged)
 
 ```bash
 make build
-# Produces bin/misbah and bin/misbah-proxy
+# Produces bin/misbah
 ```
 
 ### Namespace Container (no setup required)
@@ -165,7 +165,6 @@ Container:
 
 ```
 cmd/misbah/          Entry point
-cmd/misbah-proxy/    Network proxy binary (runs inside containers)
 cli/                 Cobra CLI commands
 daemon/              Permission daemon + container lifecycle server
 proxy/               Network, MCP, and package proxies

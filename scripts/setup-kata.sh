@@ -48,7 +48,6 @@ command -v kata-runtime >/dev/null || fail "kata-runtime not installed. Install 
 ok "Kata $(kata-runtime --version 2>&1 | head -1 | awk '{print $NF}')"
 
 [[ -f bin/misbah ]] || fail "bin/misbah not found. Run: make build"
-[[ -f bin/misbah-proxy ]] || fail "bin/misbah-proxy not found. Run: make build"
 ok "Binaries built"
 
 # --- CNI plugins ---
@@ -164,8 +163,7 @@ echo
 echo "Installing binaries..."
 
 cp bin/misbah /usr/local/bin/misbah
-cp bin/misbah-proxy /usr/local/bin/misbah-proxy
-ok "Installed /usr/local/bin/misbah and /usr/local/bin/misbah-proxy"
+ok "Installed /usr/local/bin/misbah"
 
 # --- Systemd unit ---
 

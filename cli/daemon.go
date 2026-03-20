@@ -108,6 +108,12 @@ func runDaemonStart(cmd *cobra.Command, args []string) error {
 			daemonCfg.Kata.Endpoint, daemonCfg.Kata.Handler, len(daemonCfg.Kata.Annotations))
 	}
 
+	// Create in-process permission checker, network isolator, and proxy manager
+	checker := daemon.NewDirectChecker(whitelist, prompter, audit, logger)
+	isolator := daemon.NewNetworkIsolator(daemonCfg.Network, logger)
+	proxyMgr := daemon.NewProxyManager(checker, logger, isolator)
+	opts = append(opts, daemon.WithProxyManager(proxyMgr))
+
 	server := daemon.NewServer(whitelist, prompter, audit, logger, opts...)
 
 	// Graceful shutdown
