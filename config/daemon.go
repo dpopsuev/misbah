@@ -17,6 +17,14 @@ type DaemonConfig struct {
 	Daemon      DaemonSection      `yaml:"daemon"`
 	Kata        KataSection        `yaml:"kata"`
 	Permissions PermissionsSection `yaml:"permissions"`
+	Network     NetworkSection     `yaml:"network"`
+}
+
+// NetworkSection configures per-container network isolation.
+type NetworkSection struct {
+	Bridge string `yaml:"bridge"`
+	Subnet string `yaml:"subnet"`
+	MTU    int    `yaml:"mtu"`
 }
 
 // DaemonSection configures the daemon process itself.
@@ -85,6 +93,11 @@ func DefaultDaemonConfig() *DaemonConfig {
 		Permissions: PermissionsSection{
 			Whitelist: GetWhitelistPath(),
 			AuditLog:  GetAuditLogPath(),
+		},
+		Network: NetworkSection{
+			Bridge: "misbah0",
+			Subnet: "10.88.0.0/24",
+			MTU:    1500,
 		},
 	}
 }

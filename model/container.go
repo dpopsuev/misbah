@@ -117,9 +117,10 @@ type ContainerMetadata struct {
 
 // ProcessSpec specifies the process to execute in the container.
 type ProcessSpec struct {
-	Command []string `yaml:"command"`
-	Env     []string `yaml:"env,omitempty"`
-	Cwd     string   `yaml:"cwd"`
+	Command   []string `yaml:"command"`
+	Env       []string `yaml:"env,omitempty"`
+	Cwd       string   `yaml:"cwd"`
+	NetNsName string   `yaml:"-" json:"-"` // injected at runtime for pre-created network namespace
 }
 
 // NamespaceSpec specifies which namespaces to create.

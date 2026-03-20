@@ -19,3 +19,8 @@ kata:
 permissions:
   whitelist: /var/lib/misbah/whitelist.yaml
   audit_log: /var/lib/misbah/audit.log
+
+network:
+  bridge: misbah0
+  subnet: 10.88.0.0/24
+  mtu: 1500
