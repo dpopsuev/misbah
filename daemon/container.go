@@ -11,7 +11,11 @@ type ContainerLifecycle interface {
 	Start(spec *model.ContainerSpec) error
 	Stop(name string, force bool) error
 	Destroy(name string) error
+	Exec(name string, cmd []string, timeout int64) (stdout, stderr []byte, exitCode int32, err error)
+	Status(name string) (*model.ContainerInfo, error)
+	List() ([]*model.ContainerInfo, error)
 }
+
 
 // ContainerStartRequest is sent by the CLI to start a Kata container via the daemon.
 type ContainerStartRequest struct {
@@ -39,4 +43,28 @@ type ContainerDestroyRequest struct {
 type ContainerActionResponse struct {
 	Status string `json:"status"`
 	Error  string `json:"error,omitempty"`
+}
+
+// ContainerStatusRequest is sent to get a container's status.
+type ContainerStatusRequest struct {
+	Name string `json:"name"`
+}
+
+// ContainerExecRequest is sent to execute a command in a running container.
+type ContainerExecRequest struct {
+	Name    string   `json:"name"`
+	Command []string `json:"command"`
+	Timeout int64    `json:"timeout"`
+}
+
+// ContainerExecResponse is returned with exec results.
+type ContainerExecResponse struct {
+	ExitCode int32  `json:"exit_code"`
+	Stdout   string `json:"stdout"`
+	Stderr   string `json:"stderr"`
+}
+
+// ContainerListResponse contains the list of managed containers.
+type ContainerListResponse struct {
+	Containers []*model.ContainerInfo `json:"containers"`
 }

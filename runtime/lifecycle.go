@@ -177,3 +177,18 @@ func (lc *Lifecycle) Destroy(name string) error {
 	return nil
 }
 
+// Exec executes a command in a running container.
+func (lc *Lifecycle) Exec(name string, cmd []string, timeout int64) ([]byte, []byte, int32, error) {
+	return lc.backend.Exec(name, cmd, timeout)
+}
+
+// Status returns the status of a container.
+func (lc *Lifecycle) Status(name string) (*model.ContainerInfo, error) {
+	return lc.backend.Status(name)
+}
+
+// List returns all managed containers.
+func (lc *Lifecycle) List() ([]*model.ContainerInfo, error) {
+	return lc.backend.List()
+}
+

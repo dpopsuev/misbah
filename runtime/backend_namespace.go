@@ -47,11 +47,11 @@ func (nb *NamespaceBackend) Exec(name string, cmd []string, timeout int64) ([]by
 	return nil, nil, -1, fmt.Errorf("%w: exec not available for namespace backend", ErrNotSupported)
 }
 
-func (nb *NamespaceBackend) Status(name string) (*ContainerInfo, error) {
+func (nb *NamespaceBackend) Status(name string) (*model.ContainerInfo, error) {
 	return nil, fmt.Errorf("%w: status not available for namespace backend", ErrNotSupported)
 }
 
-func (nb *NamespaceBackend) List() ([]*ContainerInfo, error) {
+func (nb *NamespaceBackend) List() ([]*model.ContainerInfo, error) {
 	return nil, fmt.Errorf("%w: list not available for namespace backend", ErrNotSupported)
 }
 

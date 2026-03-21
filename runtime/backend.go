@@ -16,17 +16,7 @@ type ContainerBackend interface {
 	Stop(name string, force bool) error
 	Destroy(name string) error
 	Exec(name string, cmd []string, timeout int64) (stdout, stderr []byte, exitCode int32, err error)
-	Status(name string) (*ContainerInfo, error)
-	List() ([]*ContainerInfo, error)
+	Status(name string) (*model.ContainerInfo, error)
+	List() ([]*model.ContainerInfo, error)
 	Close() error
-}
-
-// ContainerInfo holds runtime information about a container.
-type ContainerInfo struct {
-	ID        string
-	Name      string
-	State     string
-	SandboxID string
-	CreatedAt int64
-	ExitCode  int32
 }

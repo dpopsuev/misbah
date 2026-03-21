@@ -22,6 +22,16 @@ const (
 	RuntimeKata      = "kata"
 )
 
+// ContainerInfo holds runtime information about a container.
+type ContainerInfo struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	State     string `json:"state"`
+	SandboxID string `json:"sandbox_id,omitempty"`
+	CreatedAt int64  `json:"created_at"`
+	ExitCode  int32  `json:"exit_code"`
+}
+
 // ContainerSpec represents a container specification conforming to MSB-SPC-2026-001.
 type ContainerSpec struct {
 	Version    string            `yaml:"version"`

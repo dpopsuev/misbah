@@ -27,10 +27,20 @@ type mockLifecycle struct {
 	startErr   error
 	stopErr    error
 	destroyErr error
+	execResult *execResult
+	statusInfo *model.ContainerInfo
+	listInfos  []*model.ContainerInfo
 	started    []string
 	stopped    []string
 	destroyed  []string
 	mu         sync.Mutex
+}
+
+type execResult struct {
+	stdout   []byte
+	stderr   []byte
+	exitCode int32
+	err      error
 }
 
 func (m *mockLifecycle) Start(spec *model.ContainerSpec) error {
@@ -52,6 +62,30 @@ func (m *mockLifecycle) Destroy(name string) error {
 	defer m.mu.Unlock()
 	m.destroyed = append(m.destroyed, name)
 	return m.destroyErr
+}
+
+func (m *mockLifecycle) Exec(name string, cmd []string, timeout int64) ([]byte, []byte, int32, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.execResult != nil {
+		return m.execResult.stdout, m.execResult.stderr, m.execResult.exitCode, m.execResult.err
+	}
+	return nil, nil, -1, fmt.Errorf("exec not configured")
+}
+
+func (m *mockLifecycle) Status(name string) (*model.ContainerInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.statusInfo != nil {
+		return m.statusInfo, nil
+	}
+	return nil, fmt.Errorf("container %s not found", name)
+}
+
+func (m *mockLifecycle) List() ([]*model.ContainerInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.listInfos, nil
 }
 
 // startTestServerWithLifecycle creates a test server with a lifecycle manager
@@ -1212,4 +1246,192 @@ func TestHandleRequest_PrompterError(t *testing.T) {
 	resp := postJSON(t, client, "/permission/request", req)
 	pr := decodeResponse(t, resp)
 	assert.Equal(t, DecisionDeny, pr.Decision)
+}
+
+// --- Container list/status/exec endpoint tests ---
+
+func TestContainerList_WithLifecycle(t *testing.T) {
+	lc := &mockLifecycle{
+		listInfos: []*model.ContainerInfo{
+			{ID: "c1", Name: "agent-1", State: "running"},
+			{ID: "c2", Name: "agent-2", State: "exited", ExitCode: 0},
+		},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp, err := client.Get("http://localhost/container/list")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var listResp ContainerListResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listResp))
+	assert.Len(t, listResp.Containers, 2)
+	assert.Equal(t, "agent-1", listResp.Containers[0].Name)
+	assert.Equal(t, "running", listResp.Containers[0].State)
+}
+
+func TestContainerList_Empty(t *testing.T) {
+	lc := &mockLifecycle{}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp, err := client.Get("http://localhost/container/list")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var listResp ContainerListResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listResp))
+	assert.Empty(t, listResp.Containers)
+}
+
+func TestContainerList_NoLifecycle(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp, err := client.Get("http://localhost/container/list")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+}
+
+func TestContainerStatus_WithLifecycle(t *testing.T) {
+	lc := &mockLifecycle{
+		statusInfo: &model.ContainerInfo{
+			ID: "c1", Name: "agent-1", State: "running", CreatedAt: 1234567890,
+		},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp := postJSON(t, client, "/container/status", ContainerStatusRequest{Name: "agent-1"})
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var info model.ContainerInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&info))
+	assert.Equal(t, "agent-1", info.Name)
+	assert.Equal(t, "running", info.State)
+	assert.Equal(t, int64(1234567890), info.CreatedAt)
+}
+
+func TestContainerStatus_NotFound(t *testing.T) {
+	lc := &mockLifecycle{}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp := postJSON(t, client, "/container/status", ContainerStatusRequest{Name: "ghost"})
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestContainerExec_WithLifecycle(t *testing.T) {
+	lc := &mockLifecycle{
+		execResult: &execResult{
+			stdout:   []byte("hello world\n"),
+			stderr:   []byte(""),
+			exitCode: 0,
+		},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp := postJSON(t, client, "/container/exec", ContainerExecRequest{
+		Name:    "agent-1",
+		Command: []string{"echo", "hello world"},
+		Timeout: 30,
+	})
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var execResp ContainerExecResponse
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&execResp))
+	assert.Equal(t, int32(0), execResp.ExitCode)
+	assert.Equal(t, "hello world\n", execResp.Stdout)
+}
+
+func TestContainerExec_Error(t *testing.T) {
+	lc := &mockLifecycle{
+		execResult: &execResult{err: fmt.Errorf("exec not supported")},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServerWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+
+	resp := postJSON(t, client, "/container/exec", ContainerExecRequest{
+		Name:    "agent-1",
+		Command: []string{"echo"},
+		Timeout: 30,
+	})
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+}
+
+func TestContainerExec_NoLifecycle(t *testing.T) {
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	_, client := startTestServer(t, whitelist, &AutoDenyPrompter{})
+
+	resp := postJSON(t, client, "/container/exec", ContainerExecRequest{
+		Name:    "agent-1",
+		Command: []string{"echo"},
+		Timeout: 30,
+	})
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusServiceUnavailable, resp.StatusCode)
+}
+
+// --- Client list/status/exec tests ---
+
+func TestClient_ContainerList(t *testing.T) {
+	lc := &mockLifecycle{
+		listInfos: []*model.ContainerInfo{
+			{ID: "c1", Name: "a1", State: "running"},
+		},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	socketPath, cleanup := startTestServerForClientWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+	defer cleanup()
+
+	client := NewClient(socketPath, testLogger())
+	defer client.Close()
+
+	listResp, err := client.ContainerList(context.Background())
+	require.NoError(t, err)
+	require.Len(t, listResp.Containers, 1)
+	assert.Equal(t, "a1", listResp.Containers[0].Name)
+}
+
+func TestClient_ContainerStatus(t *testing.T) {
+	lc := &mockLifecycle{
+		statusInfo: &model.ContainerInfo{ID: "c1", Name: "a1", State: "running"},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	socketPath, cleanup := startTestServerForClientWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+	defer cleanup()
+
+	client := NewClient(socketPath, testLogger())
+	defer client.Close()
+
+	info, err := client.ContainerStatus(context.Background(), "a1")
+	require.NoError(t, err)
+	assert.Equal(t, "a1", info.Name)
+	assert.Equal(t, "running", info.State)
+}
+
+func TestClient_ContainerExec(t *testing.T) {
+	lc := &mockLifecycle{
+		execResult: &execResult{stdout: []byte("ok"), exitCode: 0},
+	}
+	whitelist := NewWhitelistStore(filepath.Join(t.TempDir(), "wl.yaml"), testLogger())
+	socketPath, cleanup := startTestServerForClientWithLifecycle(t, whitelist, &AutoDenyPrompter{}, lc)
+	defer cleanup()
+
+	client := NewClient(socketPath, testLogger())
+	defer client.Close()
+
+	result, err := client.ContainerExec(context.Background(), "a1", []string{"echo", "ok"}, 30)
+	require.NoError(t, err)
+	assert.Equal(t, int32(0), result.ExitCode)
+	assert.Equal(t, "ok", result.Stdout)
 }

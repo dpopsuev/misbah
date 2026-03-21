@@ -81,6 +81,9 @@ func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger,
 	mux.HandleFunc("/container/start", s.handleContainerStart)
 	mux.HandleFunc("/container/stop", s.handleContainerStop)
 	mux.HandleFunc("/container/destroy", s.handleContainerDestroy)
+	mux.HandleFunc("/container/list", s.handleContainerList)
+	mux.HandleFunc("/container/status", s.handleContainerStatus)
+	mux.HandleFunc("/container/exec", s.handleContainerExec)
 	mux.HandleFunc("/whitelist/load", s.handleWhitelistLoad)
 	s.httpServer = &http.Server{Handler: mux}
 
@@ -403,4 +406,83 @@ func (s *Server) handleContainerDestroy(w http.ResponseWriter, r *http.Request) 
 	}
 
 	s.writeJSON(w, ContainerActionResponse{Status: "destroyed"})
+}
+
+// handleContainerList returns all managed containers.
+func (s *Server) handleContainerList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available")
+		return
+	}
+
+	infos, err := s.lifecycle.List()
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("list failed: %v", err))
+		return
+	}
+
+	s.writeJSON(w, ContainerListResponse{Containers: infos})
+}
+
+// handleContainerStatus returns the status of a single container.
+func (s *Server) handleContainerStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available")
+		return
+	}
+
+	var req ContainerStatusRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	info, err := s.lifecycle.Status(req.Name)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, fmt.Sprintf("status failed: %v", err))
+		return
+	}
+
+	s.writeJSON(w, info)
+}
+
+// handleContainerExec executes a command in a running container.
+func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	if s.lifecycle == nil {
+		s.writeError(w, http.StatusServiceUnavailable, "container lifecycle not available")
+		return
+	}
+
+	var req ContainerExecRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	stdout, stderr, exitCode, err := s.lifecycle.Exec(req.Name, req.Command, req.Timeout)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, fmt.Sprintf("exec failed: %v", err))
+		return
+	}
+
+	s.writeJSON(w, ContainerExecResponse{
+		ExitCode: exitCode,
+		Stdout:   string(stdout),
+		Stderr:   string(stderr),
+	})
 }

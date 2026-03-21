@@ -8,7 +8,6 @@ import (
 
 	"github.com/dpopsuev/misbah/metrics"
 	"github.com/dpopsuev/misbah/model"
-	"github.com/dpopsuev/misbah/runtime"
 	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1"
 )
 
@@ -146,7 +145,7 @@ func (b *Backend) Exec(name string, cmd []string, timeout int64) ([]byte, []byte
 }
 
 // Status returns the status of a container.
-func (b *Backend) Status(name string) (*runtime.ContainerInfo, error) {
+func (b *Backend) Status(name string) (*model.ContainerInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -164,7 +163,7 @@ func (b *Backend) Status(name string) (*runtime.ContainerInfo, error) {
 		return nil, err
 	}
 
-	return &runtime.ContainerInfo{
+	return &model.ContainerInfo{
 		ID:        containerID,
 		Name:      name,
 		State:     containerStateString(status.State),
@@ -175,7 +174,7 @@ func (b *Backend) Status(name string) (*runtime.ContainerInfo, error) {
 }
 
 // List returns all tracked containers.
-func (b *Backend) List() ([]*runtime.ContainerInfo, error) {
+func (b *Backend) List() ([]*model.ContainerInfo, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -184,12 +183,12 @@ func (b *Backend) List() ([]*runtime.ContainerInfo, error) {
 		return nil, err
 	}
 
-	var result []*runtime.ContainerInfo
+	var result []*model.ContainerInfo
 	for _, c := range criContainers {
 		if c.Labels["misbah.dev/managed"] != "true" {
 			continue
 		}
-		result = append(result, &runtime.ContainerInfo{
+		result = append(result, &model.ContainerInfo{
 			ID:    c.Id,
 			Name:  c.Labels["misbah.dev/name"],
 			State: containerStateString(c.State),

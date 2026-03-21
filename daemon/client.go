@@ -68,6 +68,27 @@ func (c *Client) ContainerDestroy(ctx context.Context, name string) error {
 	return c.postAny(ctx, "/container/destroy", ContainerDestroyRequest{Name: name}, &resp)
 }
 
+// ContainerList returns all managed containers.
+func (c *Client) ContainerList(ctx context.Context) (*ContainerListResponse, error) {
+	var resp ContainerListResponse
+	err := c.getJSON(ctx, "/container/list", &resp)
+	return &resp, err
+}
+
+// ContainerStatus returns the status of a single container.
+func (c *Client) ContainerStatus(ctx context.Context, name string) (*model.ContainerInfo, error) {
+	var resp model.ContainerInfo
+	err := c.postAny(ctx, "/container/status", ContainerStatusRequest{Name: name}, &resp)
+	return &resp, err
+}
+
+// ContainerExec executes a command in a running container.
+func (c *Client) ContainerExec(ctx context.Context, name string, cmd []string, timeout int64) (*ContainerExecResponse, error) {
+	var resp ContainerExecResponse
+	err := c.postAny(ctx, "/container/exec", ContainerExecRequest{Name: name, Command: cmd, Timeout: timeout}, &resp)
+	return &resp, err
+}
+
 // WhitelistLoad sends a container spec to the daemon to pre-load its whitelist rules.
 func (c *Client) WhitelistLoad(ctx context.Context, spec *model.ContainerSpec) error {
 	var resp ContainerActionResponse
@@ -77,6 +98,37 @@ func (c *Client) WhitelistLoad(ctx context.Context, spec *model.ContainerSpec) e
 // Close cleans up the client's resources.
 func (c *Client) Close() {
 	c.httpClient.CloseIdleConnections()
+}
+
+// getJSON sends a GET request and decodes the JSON response.
+func (c *Client) getJSON(ctx context.Context, path string, dest interface{}) error {
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost"+path, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("daemon request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errResp map[string]string
+		json.NewDecoder(resp.Body).Decode(&errResp)
+		msg := errResp["error"]
+		if msg == "" {
+			msg = fmt.Sprintf("status %d", resp.StatusCode)
+		}
+		return fmt.Errorf("daemon: %s", msg)
+	}
+
+	if dest != nil {
+		if err := json.NewDecoder(resp.Body).Decode(dest); err != nil {
+			return fmt.Errorf("decode response: %w", err)
+		}
+	}
+	return nil
 }
 
 // postAny sends any JSON body and decodes the response into dest.
