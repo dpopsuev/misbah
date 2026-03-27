@@ -1,17 +1,75 @@
+# golangci-lint config — aligned with Lex rules
+# go-best-practices, code-smells, naming, hexagonal-architecture, solid-principles
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  disable-all: true
+  enable:
+    # --- Default / essential ---
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - gosimple
+    - typecheck
+
+    # --- Lex: go-best-practices ---
+    - goconst         # §1: constants over embedded literals
+    - errorlint       # §2: wrap errors with %w, use errors.Is/As
+    - nestif          # §3: max nesting depth
+    - gocritic        # §3+§4: switch over if-else, modern APIs
+    - bodyclose       # §6: resource cleanup (HTTP response bodies)
+    - prealloc        # §7: pre-allocate slices when length known
+    - thelper         # §12: t.Helper() in test helpers
+
+    # --- Lex: code-smells ---
+    - gocyclo         # cyclomatic complexity
+    - funlen          # function length
+    - dupl            # code duplication
+
+    # --- Lex: naming ---
+    - revive          # naming conventions, style
+    - misspell        # typos in comments and strings
+
+    # --- Lex: hexagonal-architecture + solid ---
+    - depguard        # dependency direction enforcement
+    - goimports       # import grouping and formatting
+    - unconvert       # unnecessary type conversions
+    - unparam         # unused function parameters
+
+    # --- Formatting ---
+    - gofmt           # go fmt compliance
+
+    # --- Security ---
+    - gosec           # security issues
+    - nakedret        # naked returns in long functions
+
+    # --- Line length ---
+    - lll             # line length limit
+
 linters-settings:
   govet:
     check-shadowing: true
-  gocyclo:
-    min-complexity: 15
-  dupl:
-    threshold: 100
+
+  errcheck:
+    check-type-assertions: false
+
   goconst:
     min-len: 2
-    min-occurrences: 2
-  misspell:
-    locale: US
-  lll:
-    line-length: 120
+    min-occurrences: 3
+
+  errorlint:
+    errorf: true
+    asserts: true
+    comparison: true
+
+  nestif:
+    min-complexity: 4
+
   gocritic:
     enabled-tags:
       - diagnostic
@@ -20,29 +78,60 @@ linters-settings:
       - performance
       - style
 
-linters:
-  disable-all: true
-  enable:
-    - bodyclose
-    - dupl
-    - errcheck
-    - goconst
-    - gocritic
-    - gocyclo
-    - gofmt
-    - goimports
-    - gosec
-    - gosimple
-    - govet
-    - ineffassign
-    - lll
-    - misspell
-    - nakedret
-    - staticcheck
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
+  gocyclo:
+    min-complexity: 15
+
+  funlen:
+    lines: 100
+    statements: 60
+
+  dupl:
+    threshold: 100
+
+  misspell:
+    locale: US
+
+  lll:
+    line-length: 120
+
+  revive:
+    rules:
+      - name: exported
+        disabled: true
+      - name: unexported-return
+        disabled: false
+      - name: blank-imports
+        disabled: false
+      - name: context-as-argument
+        disabled: false
+      - name: error-return
+        disabled: false
+      - name: error-naming
+        disabled: false
+      - name: increment-decrement
+        disabled: false
+      - name: var-declaration
+        disabled: false
+      - name: range
+        disabled: false
+      - name: receiver-naming
+        disabled: false
+
+  depguard:
+    rules:
+      main:
+        deny:
+          - pkg: "log"
+            desc: "use zerolog instead of stdlib log"
+
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+
+  thelper:
+    test:
+      begin: true
 
 issues:
   exclude-rules:
@@ -51,9 +140,13 @@ issues:
         - dupl
         - gosec
         - goconst
+        - funlen
+        - errcheck
+    - path: test/
+      linters:
+        - dupl
+        - gosec
+        - goconst
+        - funlen
   max-issues-per-linter: 0
   max-same-issues: 0
-
-run:
-  timeout: 5m
-  tests: true
