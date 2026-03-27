@@ -31,11 +31,14 @@ install-system: build
 	install -dm755 /etc/misbah
 	@test -f /etc/misbah/daemon.yaml || install -Dm644 assets/daemon.yaml /etc/misbah/daemon.yaml
 	@getent group misbah >/dev/null 2>&1 || groupadd misbah
-	@echo "Adding $(SUDO_USER) to misbah group..." && usermod -aG misbah $(SUDO_USER) 2>/dev/null || true
+	@if ! id -nG $(SUDO_USER) 2>/dev/null | grep -qw misbah; then \
+		echo "Adding $(SUDO_USER) to misbah group..."; \
+		usermod -aG misbah $(SUDO_USER); \
+		echo "Re-login or use 'sg misbah' to activate group membership."; \
+	fi
 	systemctl daemon-reload
 	@echo ""
 	@echo "Installed. To start: sudo systemctl start misbah-daemon"
-	@echo "Re-login or use 'sg misbah' to activate group membership."
 
 ## uninstall-system: Remove binaries, systemd unit (run as root)
 uninstall-system:
