@@ -32,18 +32,27 @@ func GenerateTierMounts(spec *TierSpec) ([]model.MountSpec, error) {
 		})
 	}
 
-	// 2. Overlay writable paths (RW bind mounts on top of RO)
-	for _, wp := range spec.WritablePaths {
+	// 2. Overlay writable paths — copy-on-write via overlayfs.
+	// Each writable path gets its own overlay with a unique upper/work dir.
+	// Agent writes are captured in upper. Real workspace is untouched.
+	for i, wp := range spec.WritablePaths {
 		source, dest, err := resolveWritablePath(spec.Repos, workspace, wp)
 		if err != nil {
 			return nil, err
 		}
 
+		upperDir := fmt.Sprintf("/tmp/misbah-overlay-%s-%d/upper", filepath.Base(spec.Repos[0]), i)
+		workDir := fmt.Sprintf("/tmp/misbah-overlay-%s-%d/work", filepath.Base(spec.Repos[0]), i)
+
 		rwMounts = append(rwMounts, model.MountSpec{
-			Type:        model.MountTypeBind,
+			Type:        model.MountTypeOverlay,
 			Source:      source,
 			Destination: dest,
-			Options:     []string{"rw", "rbind"},
+			Overlay: &model.OverlaySpec{
+				Lower: source,
+				Upper: upperDir,
+				Work:  workDir,
+			},
 		})
 	}
 

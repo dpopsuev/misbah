@@ -68,3 +68,25 @@ type ContainerExecResponse struct {
 type ContainerListResponse struct {
 	Containers []*model.ContainerInfo `json:"containers"`
 }
+
+// ContainerLogsResponse contains captured stdout/stderr for a container.
+type ContainerLogsResponse struct {
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+}
+
+// ContainerDiffRequest requests the diff for a container's overlay.
+type ContainerDiffRequest struct {
+	Name string `json:"name"`
+}
+
+// ContainerDiffResponse contains the list of changed files.
+type ContainerDiffResponse struct {
+	Entries []DiffEntry `json:"entries"`
+}
+
+// ContainerCommitRequest promotes selected files from overlay to real workspace.
+type ContainerCommitRequest struct {
+	Name  string   `json:"name"`
+	Paths []string `json:"paths"`
+}

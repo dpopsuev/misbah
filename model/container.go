@@ -14,6 +14,7 @@ const (
 	MountTypeTmpfs    = "tmpfs"
 	MountTypeProc     = "proc"
 	MountTypeGitClone = "git-clone"
+	MountTypeOverlay  = "overlay"
 )
 
 // Runtime backend constants.
@@ -158,11 +159,20 @@ type NamespaceSpec struct {
 
 // MountSpec specifies a mount operation.
 type MountSpec struct {
-	Type        string        `yaml:"type"`                  // bind, tmpfs, proc, git-clone
+	Type        string        `yaml:"type"`                  // bind, tmpfs, proc, git-clone, overlay
 	Source      string        `yaml:"source,omitempty"`
 	Destination string        `yaml:"destination"`
 	Options     []string      `yaml:"options,omitempty"`     // ro, rw, nosuid, nodev, etc.
 	GitClone    *GitCloneSpec `yaml:"git_clone,omitempty"`   // required when type is "git-clone"
+	Overlay     *OverlaySpec  `yaml:"overlay,omitempty"`     // required when type is "overlay"
+}
+
+// OverlaySpec configures a copy-on-write overlay filesystem.
+// The agent sees the merged view. Writes go to upper. Lower is read-only.
+type OverlaySpec struct {
+	Lower string `yaml:"lower"` // real workspace (read-only base)
+	Upper string `yaml:"upper"` // writable layer (agent's changes)
+	Work  string `yaml:"work"`  // overlayfs scratch directory
 }
 
 // GitCloneSpec specifies a remote repository to clone and mount.
@@ -379,8 +389,21 @@ func (m *MountSpec) Validate() error {
 		if m.Source != "" {
 			return fmt.Errorf("git-clone mount must not specify source (auto-generated)")
 		}
+	case MountTypeOverlay:
+		if m.Overlay == nil {
+			return fmt.Errorf("overlay mount requires overlay specification")
+		}
+		if m.Overlay.Lower == "" {
+			return fmt.Errorf("overlay mount requires lower directory")
+		}
+		if m.Overlay.Upper == "" {
+			return fmt.Errorf("overlay mount requires upper directory")
+		}
+		if m.Overlay.Work == "" {
+			return fmt.Errorf("overlay mount requires work directory")
+		}
 	default:
-		return fmt.Errorf("invalid mount type: %s (must be bind, tmpfs, proc, or git-clone)", m.Type)
+		return fmt.Errorf("invalid mount type: %s (must be bind, tmpfs, proc, git-clone, or overlay)", m.Type)
 	}
 
 	// Validate destination

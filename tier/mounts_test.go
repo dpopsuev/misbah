@@ -3,6 +3,7 @@ package tier
 import (
 	"testing"
 
+	"github.com/dpopsuev/misbah/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -43,7 +44,7 @@ func TestGenerateTierMounts_Sys(t *testing.T) {
 	// Second: RW overlay (filepath.Join strips trailing slash)
 	assert.Equal(t, "/home/user/misbah/src", mounts[1].Source)
 	assert.Equal(t, "/workspace/misbah/src", mounts[1].Destination)
-	assert.Contains(t, mounts[1].Options, "rw")
+	assert.Equal(t, model.MountTypeOverlay, mounts[1].Type)
 }
 
 func TestGenerateTierMounts_Com(t *testing.T) {
@@ -59,7 +60,7 @@ func TestGenerateTierMounts_Com(t *testing.T) {
 
 	assert.Contains(t, mounts[0].Options, "ro")
 	assert.Equal(t, "/workspace/misbah/pkg/auth", mounts[1].Destination)
-	assert.Contains(t, mounts[1].Options, "rw")
+	assert.Equal(t, model.MountTypeOverlay, mounts[1].Type)
 }
 
 func TestGenerateTierMounts_Mod(t *testing.T) {
@@ -75,7 +76,7 @@ func TestGenerateTierMounts_Mod(t *testing.T) {
 
 	assert.Contains(t, mounts[0].Options, "ro")
 	assert.Equal(t, "/home/user/misbah/pkg/auth/handler.go", mounts[1].Source)
-	assert.Contains(t, mounts[1].Options, "rw")
+	assert.Equal(t, model.MountTypeOverlay, mounts[1].Type)
 }
 
 func TestGenerateTierMounts_MultipleRepos(t *testing.T) {
@@ -111,8 +112,8 @@ func TestGenerateTierMounts_MultipleWritablePaths(t *testing.T) {
 	// RO first
 	assert.Contains(t, mounts[0].Options, "ro")
 	// RW overlays after
-	assert.Contains(t, mounts[1].Options, "rw")
-	assert.Contains(t, mounts[2].Options, "rw")
+	assert.Equal(t, model.MountTypeOverlay, mounts[1].Type)
+	assert.Equal(t, model.MountTypeOverlay, mounts[2].Type)
 }
 
 func TestGenerateTierMounts_MountOrdering(t *testing.T) {
@@ -129,8 +130,8 @@ func TestGenerateTierMounts_MountOrdering(t *testing.T) {
 	// First mount must be RO (mount order matters)
 	assert.Contains(t, mounts[0].Options, "ro")
 	// Subsequent mounts are RW overlays
-	assert.Contains(t, mounts[1].Options, "rw")
-	assert.Contains(t, mounts[2].Options, "rw")
+	assert.Equal(t, model.MountTypeOverlay, mounts[1].Type)
+	assert.Equal(t, model.MountTypeOverlay, mounts[2].Type)
 }
 
 func TestGenerateTierMounts_CustomWorkspace(t *testing.T) {

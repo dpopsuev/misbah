@@ -31,6 +31,9 @@ type Server struct {
 	lifecycle  ContainerLifecycle
 	proxyMgr   *ProxyManager
 	vsockCfg   *VsockConfig
+	events     *EventBus
+	logs       *LogStore
+	overlays   *OverlayStore
 	listener   net.Listener
 	httpServer *http.Server
 }
@@ -69,6 +72,9 @@ func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger,
 		prompter:  prompter,
 		audit:     audit,
 		logger:    logger,
+		events:    NewEventBus(),
+		logs:      NewLogStore(),
+		overlays:  NewOverlayStore(),
 	}
 	for _, opt := range opts {
 		opt(s)
@@ -85,6 +91,10 @@ func NewServer(whitelist *WhitelistStore, prompter Prompter, audit *AuditLogger,
 	mux.HandleFunc("/container/status", s.handleContainerStatus)
 	mux.HandleFunc("/container/exec", s.handleContainerExec)
 	mux.HandleFunc("/whitelist/load", s.handleWhitelistLoad)
+	mux.HandleFunc("/container/events", s.handleContainerEvents)
+	mux.HandleFunc("/container/logs", s.handleContainerLogs)
+	mux.HandleFunc("/container/diff", s.handleContainerDiff)
+	mux.HandleFunc("/container/commit", s.handleContainerCommit)
 	s.httpServer = &http.Server{Handler: mux}
 
 	return s
@@ -335,11 +345,14 @@ func (s *Server) handleContainerStart(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Start in a goroutine — lifecycle.Start blocks until the container exits
+	s.events.Publish(ContainerEvent{Type: EventStarted, Name: name})
 	go func() {
 		if err := s.lifecycle.Start(req.Spec); err != nil {
 			s.logger.Errorf("Container %s failed: %v", name, err)
+			s.events.Publish(ContainerEvent{Type: EventError, Name: name, Error: err.Error()})
 		} else {
 			s.logger.Infof("Container %s exited successfully", name)
+			s.events.Publish(ContainerEvent{Type: EventExited, Name: name, ExitCode: 0})
 		}
 		if s.proxyMgr != nil {
 			s.proxyMgr.Stop(name)
@@ -485,4 +498,123 @@ func (s *Server) handleContainerExec(w http.ResponseWriter, r *http.Request) {
 		Stdout:   string(stdout),
 		Stderr:   string(stderr),
 	})
+}
+
+// handleContainerEvents streams container lifecycle events via SSE.
+// GET /container/events?name=X (optional — omit name for all containers).
+func (s *Server) handleContainerEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		s.writeError(w, http.StatusInternalServerError, "streaming not supported")
+		return
+	}
+
+	name := r.URL.Query().Get("name")
+	ch := s.events.Subscribe(name)
+	defer s.events.Unsubscribe(name, ch)
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.WriteHeader(http.StatusOK)
+	flusher.Flush()
+
+	ctx := r.Context()
+	for {
+		select {
+		case ev, ok := <-ch:
+			if !ok {
+				return
+			}
+			data, _ := json.Marshal(ev)
+			fmt.Fprintf(w, "data: %s\n\n", data)
+			flusher.Flush()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// handleContainerLogs returns captured stdout/stderr for a container.
+// GET /container/logs?name=X
+func (s *Server) handleContainerLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "GET required")
+		return
+	}
+
+	name := r.URL.Query().Get("name")
+	if name == "" {
+		s.writeError(w, http.StatusBadRequest, "name parameter required")
+		return
+	}
+
+	stdout, stderr, ok := s.logs.Get(name)
+	if !ok {
+		s.writeError(w, http.StatusNotFound, fmt.Sprintf("no logs for container %q", name))
+		return
+	}
+
+	s.writeJSON(w, ContainerLogsResponse{
+		Stdout: stdout,
+		Stderr: stderr,
+	})
+}
+
+// LogStore returns the server's log store for use by backends.
+func (s *Server) LogStore() *LogStore {
+	return s.logs
+}
+
+// OverlayStore returns the server's overlay store for tracking container overlays.
+func (s *Server) OverlayStore() *OverlayStore {
+	return s.overlays
+}
+
+// handleContainerDiff returns changed files in a container's overlay.
+func (s *Server) handleContainerDiff(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req ContainerDiffRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	entries, err := s.overlays.Diff(req.Name)
+	if err != nil {
+		s.writeError(w, http.StatusNotFound, err.Error())
+		return
+	}
+
+	s.writeJSON(w, ContainerDiffResponse{Entries: entries})
+}
+
+// handleContainerCommit promotes selected files from overlay to real workspace.
+func (s *Server) handleContainerCommit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "POST required")
+		return
+	}
+
+	var req ContainerCommitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.writeError(w, http.StatusBadRequest, fmt.Sprintf("invalid JSON: %v", err))
+		return
+	}
+
+	if err := s.overlays.Commit(req.Name, req.Paths); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	s.writeJSON(w, ContainerActionResponse{Status: "committed"})
 }

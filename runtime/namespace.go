@@ -161,6 +161,8 @@ func (nm *NamespaceManager) buildMountScript(mounts []model.MountSpec) string {
 			script.WriteString(nm.buildTmpfsMount(mount))
 		case model.MountTypeProc:
 			script.WriteString(nm.buildProcMount(mount))
+		case model.MountTypeOverlay:
+			script.WriteString(nm.buildOverlayMount(mount))
 		default:
 			nm.logger.Warnf("Unknown mount type: %s", mount.Type)
 		}
@@ -222,6 +224,29 @@ func (nm *NamespaceManager) buildTmpfsMount(mount model.MountSpec) string {
 		options, mount.Destination))
 
 	nm.logger.Debugf("Will tmpfs mount %s", mount.Destination)
+
+	return script.String()
+}
+
+// buildOverlayMount builds an overlay filesystem mount using fuse-overlayfs.
+// Works in unprivileged user namespaces. Agent sees merged view (lower + upper).
+func (nm *NamespaceManager) buildOverlayMount(mount model.MountSpec) string {
+	var script strings.Builder
+
+	ov := mount.Overlay
+
+	// Create upper, work, and destination directories.
+	for _, d := range []string{ov.Upper, ov.Work, mount.Destination} {
+		script.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", d))
+	}
+
+	// Mount via fuse-overlayfs (unprivileged).
+	script.WriteString(fmt.Sprintf(
+		"fuse-overlayfs -o lowerdir=%s,upperdir=%s,workdir=%s %s\n",
+		ov.Lower, ov.Upper, ov.Work, mount.Destination))
+
+	nm.logger.Debugf("Will overlay mount %s (lower=%s, upper=%s) -> %s",
+		ov.Lower, ov.Lower, ov.Upper, mount.Destination)
 
 	return script.String()
 }

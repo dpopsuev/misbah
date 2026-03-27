@@ -95,6 +95,98 @@ func (c *Client) WhitelistLoad(ctx context.Context, spec *model.ContainerSpec) e
 	return c.postAny(ctx, "/whitelist/load", ContainerStartRequest{Spec: spec}, &resp)
 }
 
+// ContainerDiff returns files changed in a container's overlay.
+func (c *Client) ContainerDiff(ctx context.Context, name string) (*ContainerDiffResponse, error) {
+	var resp ContainerDiffResponse
+	err := c.postAny(ctx, "/container/diff", ContainerDiffRequest{Name: name}, &resp)
+	return &resp, err
+}
+
+// ContainerCommit promotes selected files from overlay to real workspace.
+func (c *Client) ContainerCommit(ctx context.Context, name string, paths []string) error {
+	var resp ContainerActionResponse
+	return c.postAny(ctx, "/container/commit", ContainerCommitRequest{Name: name, Paths: paths}, &resp)
+}
+
+// ContainerLogs returns captured stdout/stderr for a container.
+func (c *Client) ContainerLogs(ctx context.Context, name string) (*ContainerLogsResponse, error) {
+	var resp ContainerLogsResponse
+	err := c.getJSON(ctx, "/container/logs?name="+name, &resp)
+	return &resp, err
+}
+
+// ContainerEvents subscribes to lifecycle events for the given container (or all if name is empty).
+// Returns a channel that receives events. Close the context to stop.
+func (c *Client) ContainerEvents(ctx context.Context, name string) (<-chan ContainerEvent, error) {
+	path := "/container/events"
+	if name != "" {
+		path += "?name=" + name
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost"+path, nil)
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("daemon request: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("daemon: status %d", resp.StatusCode)
+	}
+
+	ch := make(chan ContainerEvent, 16)
+	go func() {
+		defer resp.Body.Close()
+		defer close(ch)
+		dec := json.NewDecoder(resp.Body)
+		for {
+			// SSE format: "data: {...}\n\n" — we need to skip the "data: " prefix.
+			var line string
+			// Read line by line.
+			buf := make([]byte, 0, 4096)
+			b := make([]byte, 1)
+			for {
+				_, err := resp.Body.Read(b)
+				if err != nil {
+					return
+				}
+				if b[0] == '\n' {
+					if len(buf) == 0 {
+						continue // skip empty lines
+					}
+					break
+				}
+				buf = append(buf, b[0])
+			}
+			line = string(buf)
+
+			// Strip "data: " prefix.
+			const prefix = "data: "
+			if len(line) > len(prefix) && line[:len(prefix)] == prefix {
+				line = line[len(prefix):]
+			}
+
+			var ev ContainerEvent
+			if err := json.Unmarshal([]byte(line), &ev); err != nil {
+				continue
+			}
+
+			select {
+			case ch <- ev:
+			case <-ctx.Done():
+				return
+			}
+
+			_ = dec // suppress unused
+		}
+	}()
+	return ch, nil
+}
+
 // Close cleans up the client's resources.
 func (c *Client) Close() {
 	c.httpClient.CloseIdleConnections()

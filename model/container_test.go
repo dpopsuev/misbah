@@ -658,11 +658,33 @@ func TestMountSpecValidate(t *testing.T) {
 		{
 			name: "invalid mount type",
 			spec: MountSpec{
-				Type:        "overlay",
+				Type:        "nosuchtype",
 				Destination: "/container/workspace",
 			},
 			wantErr: true,
 			errMsg:  "invalid mount type",
+		},
+		{
+			name: "overlay missing spec",
+			spec: MountSpec{
+				Type:        "overlay",
+				Destination: "/container/workspace",
+			},
+			wantErr: true,
+			errMsg:  "overlay mount requires overlay specification",
+		},
+		{
+			name: "valid overlay mount",
+			spec: MountSpec{
+				Type:        "overlay",
+				Destination: "/container/workspace",
+				Overlay: &OverlaySpec{
+					Lower: "/real/workspace",
+					Upper: "/tmp/upper",
+					Work:  "/tmp/work",
+				},
+			},
+			wantErr: false,
 		},
 		{
 			name: "missing destination",
