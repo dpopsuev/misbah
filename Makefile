@@ -1,4 +1,4 @@
-.PHONY: build test test-unit test-integration test-e2e test-e2e-netns test-e2e-claude install install-system uninstall-system clean lint fmt vet coverage help
+.PHONY: build test test-unit test-integration test-e2e test-e2e-netns test-e2e-claude install install-system uninstall-system clean lint lint-new fmt vet preflight install-hooks coverage help
 
 # Build variables
 BINARY_NAME=misbah
@@ -159,6 +159,20 @@ lint:
 	else \
 		echo "golangci-lint not installed. Install from https://golangci-lint.run/usage/install/"; \
 	fi
+
+## lint-new: Lint only changed code (fast, for pre-commit)
+lint-new:
+	golangci-lint run --new-from-rev=HEAD ./...
+
+## preflight: Full check before push
+preflight: fmt vet lint test
+
+## install-hooks: Wire git pre-commit to make lint-new
+install-hooks:
+	@echo '#!/bin/sh' > .git/hooks/pre-commit
+	@echo 'make lint-new' >> .git/hooks/pre-commit
+	@chmod +x .git/hooks/pre-commit
+	@echo "pre-commit hook installed (runs make lint-new)"
 
 ## fmt: Format code
 fmt:
