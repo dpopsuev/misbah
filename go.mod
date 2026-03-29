@@ -1,11 +1,12 @@
 module github.com/dpopsuev/misbah
 
-go 1.25.7
+go 1.25.8
 
 require (
 	github.com/mdlayher/vsock v1.2.1
 	github.com/rs/zerolog v1.32.0
 	github.com/spf13/cobra v1.8.0
+	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	github.com/vishvananda/netlink v1.3.1
 	github.com/vishvananda/netns v0.0.5
@@ -16,6 +17,7 @@ require (
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
+	github.com/dpopsuev/mirage v0.2.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/kr/text v0.2.0 // indirect
@@ -23,7 +25,6 @@ require (
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mdlayher/socket v0.4.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/spf13/pflag v1.0.5 // indirect
 	golang.org/x/net v0.48.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.39.0 // indirect

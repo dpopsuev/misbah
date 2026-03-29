@@ -2,109 +2,92 @@ package daemon
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"sync"
+
+	"github.com/dpopsuev/mirage"
 )
 
+// DiffEntry re-exports mirage.Change for backward compatibility.
+type DiffEntry = mirage.Change
+
 // OverlayStore tracks overlay directories per container for diff/commit.
+// Wraps mirage.Space instances for each container.
 type OverlayStore struct {
-	mu       sync.RWMutex
-	overlays map[string]*OverlayInfo
+	mu     sync.RWMutex
+	spaces map[string]mirage.Space
+	dirs   map[string]overlayDirs // lower/upper paths for registration
 }
 
-// OverlayInfo holds the overlay paths for a container.
-type OverlayInfo struct {
-	Lower string // real workspace (read-only)
-	Upper string // agent's changes
+type overlayDirs struct {
+	lower string
+	upper string
 }
 
 // NewOverlayStore creates an overlay store.
 func NewOverlayStore() *OverlayStore {
-	return &OverlayStore{overlays: make(map[string]*OverlayInfo)}
+	return &OverlayStore{
+		spaces: make(map[string]mirage.Space),
+		dirs:   make(map[string]overlayDirs),
+	}
 }
 
 // Register records overlay paths for a container.
-func (s *OverlayStore) Register(name string, lower, upper string) {
+// Creates a plain mirage space (no fuse mount — Misbah manages the mount externally).
+func (s *OverlayStore) Register(name, lower, upper string) {
 	s.mu.Lock()
-	s.overlays[name] = &OverlayInfo{Lower: lower, Upper: upper}
+	s.dirs[name] = overlayDirs{lower: lower, upper: upper}
+	// Create a plain space wrapping the existing lower/upper dirs.
+	s.spaces[name] = &plainMirageSpace{lower: lower, upper: upper}
 	s.mu.Unlock()
 }
 
 // Remove deletes tracking for a container.
 func (s *OverlayStore) Remove(name string) {
 	s.mu.Lock()
-	delete(s.overlays, name)
+	delete(s.spaces, name)
+	delete(s.dirs, name)
 	s.mu.Unlock()
-}
-
-// DiffEntry represents a changed file in the overlay.
-type DiffEntry struct {
-	Path   string `json:"path"`
-	Change string `json:"change"` // "modified", "created", "deleted"
 }
 
 // Diff returns files changed by the agent in the overlay.
 func (s *OverlayStore) Diff(name string) ([]DiffEntry, error) {
 	s.mu.RLock()
-	ov, ok := s.overlays[name]
+	space, ok := s.spaces[name]
 	s.mu.RUnlock()
 
 	if !ok {
 		return nil, fmt.Errorf("no overlay for container %q", name)
 	}
-
-	var entries []DiffEntry
-	err := filepath.Walk(ov.Upper, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if path == ov.Upper {
-			return nil
-		}
-		if info.IsDir() {
-			return nil
-		}
-		rel, _ := filepath.Rel(ov.Upper, path)
-
-		// Check if file exists in lower to classify change type.
-		change := "created"
-		if _, err := os.Stat(filepath.Join(ov.Lower, rel)); err == nil {
-			change = "modified"
-		}
-		entries = append(entries, DiffEntry{Path: rel, Change: change})
-		return nil
-	})
-	return entries, err
+	return space.Diff()
 }
 
 // Commit copies selected files from overlay upper to real workspace (lower).
 func (s *OverlayStore) Commit(name string, paths []string) error {
 	s.mu.RLock()
-	ov, ok := s.overlays[name]
+	space, ok := s.spaces[name]
 	s.mu.RUnlock()
 
 	if !ok {
 		return fmt.Errorf("no overlay for container %q", name)
 	}
-
-	for _, p := range paths {
-		src := filepath.Join(ov.Upper, p)
-		dst := filepath.Join(ov.Lower, p)
-
-		data, err := os.ReadFile(src)
-		if err != nil {
-			return fmt.Errorf("commit read %s: %w", p, err)
-		}
-
-		if err := os.MkdirAll(filepath.Dir(dst), 0755); err != nil {
-			return fmt.Errorf("commit mkdir: %w", err)
-		}
-
-		info, _ := os.Stat(src)
-		if err := os.WriteFile(dst, data, info.Mode()); err != nil {
-			return fmt.Errorf("commit write %s: %w", p, err)
-		}
-	}
-	return nil
+	return space.Commit(paths)
 }
+
+// plainMirageSpace wraps existing lower/upper directories as a mirage.Space.
+// Misbah manages the fuse mount externally — this space only does diff/commit.
+type plainMirageSpace struct {
+	lower string
+	upper string
+}
+
+func (s *plainMirageSpace) Diff() ([]mirage.Change, error) {
+	return mirage.DiffDirs(s.lower, s.upper)
+}
+
+func (s *plainMirageSpace) Commit(paths []string) error {
+	return mirage.CommitFiles(s.upper, s.lower, paths)
+}
+
+func (s *plainMirageSpace) Reset() error   { return nil } // Misbah manages lifecycle
+func (s *plainMirageSpace) Destroy() error { return nil } // Misbah manages lifecycle
+func (s *plainMirageSpace) WorkDir() string { return s.upper }
